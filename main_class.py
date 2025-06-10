@@ -41,7 +41,7 @@ class FireflyClient:
         self.base_url = base_url
         self.headers = headers
 
-    def get_blik_transactions(self):
+    def get_blik_transactions(self,exact_match=True):
         url = f"{self.base_url}/api/v1/transactions"
         params = {
             "limit": 1000,
@@ -66,8 +66,13 @@ class FireflyClient:
 
                 sub = subtransactions[0]
                 category_data = sub.get("relationships", {}).get("category", {}).get("data")
-
-                if category_data is None and DESCRIPTION_FILTER.lower() == sub["description"].lower():
+                description = sub["description"].lower()
+                filter_text = DESCRIPTION_FILTER.lower()
+                filter_check = (
+                    description == filter_text.lower() if exact_match
+                    else filter_text.lower() in description
+                )
+                if category_data is None and filter_check:
                     transactions.append({
                         "id": t["id"],
                         "description": sub["description"],
@@ -144,7 +149,7 @@ class TransactionProcessor:
         self.bank_records = bank_records
 
     def process(self):
-        firefly_transactions = self.firefly_client.get_blik_transactions()
+        firefly_transactions = self.firefly_client.get_blik_transactions(True)
 
         for tx in firefly_transactions:
             print(f"\n📌 Firefly: ID {tx['id']} | {tx['date']} | {tx['amount']} PLN | {tx['description']}")
