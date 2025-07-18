@@ -1,14 +1,19 @@
+from typing import List, cast
+
 from fireflyiii_enricher_core.firefly_client import (FireflyClient,
-                                                    filter_single_part,
-                                                    filter_without_category,
+                                                     filter_single_part,
+                                                     filter_without_category,
                                                      filter_by_description,
-                                                     simplify_transactions)
+                                                     simplify_transactions, SimplifiedTx)
 from fireflyiii_enricher_core.matcher import TransactionMatcher
+
+from txt_parser import SimplifiedRecord
+
 
 class TransactionProcessor:
     """Logika przetwarzania i aktualizacji transakcji"""
 
-    def __init__(self, firefly_client:FireflyClient, bank_records):
+    def __init__(self, firefly_client: FireflyClient, bank_records):
         self.firefly_client = firefly_client
         self.bank_records = bank_records
 
@@ -17,12 +22,12 @@ class TransactionProcessor:
         single = filter_single_part(raw)
         uncategorized = filter_without_category(single)
         filtered = filter_by_description(uncategorized, filter_text, exact_match
-        )
-        firefly_transactions = simplify_transactions(filtered)
+                                         )
+        firefly_transactions: List[SimplifiedTx] = simplify_transactions(filtered)
 
         for tx in firefly_transactions:
             print("\n📌 Firefly: ID %s | %s | %s PLN | %s" % (
-                tx['id'], tx['date'], tx['amount'], tx['description']))
+                tx.id, tx.date, tx.amount, tx.description))
             print("   🔍 Możliwe dopasowania z CSV:")
 
             matches = TransactionMatcher.match(tx, self.bank_records)
@@ -31,30 +36,30 @@ class TransactionProcessor:
                 print("   ⚠️ Brak dopasowań.")
                 continue
 
-            if "blik_done" in tx['tags']:
+            if "blik_done" in tx.tags:
                 print("   Oznaczone tagiem 'blik_done' -omijam ")
                 continue
 
-
-
-            for i, record in enumerate(matches, start=1):
-                sender = record.get("sender", "–")
-                recipient = record.get("recipient", "–")
-                if record.get("recipient", "–") in tx['description']:
+            for i, record_raw in enumerate(matches, start=1):
+                record:SimplifiedRecord  = cast(SimplifiedRecord,record_raw)
+                sender = "" #record.sender
+                recipient = record.recipient
+                if record.recipient in tx.description:
                     print("   Odbiorca jest już umieszczony -omijam ")
                     continue
-                details = record.get("details", "–")
+                details = record.details
                 print("\n   💬 Dopasowanie #%d" % i)
-                print(f"      📅 Data: {record['date']}")
-                print(f"      💰 Kwota: {record['amount']} PLN")
+                print(f"      📅 Data: {record.date}")
+                print(f"      💰 Kwota: {record.amount} PLN")
                 print(f"      👤 Nadawca: {sender}")
                 print(f"      🏷️ Odbiorca: {recipient}")
-                print(f"      🏷️ Tagi: {tx['tags']}")
+                print(f"      🏷️ Tagi: {tx.tags}")
                 print(f"      📝 Szczegóły: {details}")
                 print(f"          Nowy opis: {tx['description']};{recipient}")
-                choice = input("      ❓ Czy chcesz zaktualizować opis w Firefly na podstawie tego wpisu? (t/n/q): ").strip().lower()
+                choice = input(
+                    "      ❓ Czy chcesz zaktualizować opis w Firefly na podstawie tego wpisu? (t/n/q): ").strip().lower()
                 if choice == 't':
-                    new_description = f"{tx['description']};{recipient}"
+                    new_description = f"{tx.description};{recipient}"
                     self.firefly_client.update_transaction_description(
                         tx["id"], new_description
                     )

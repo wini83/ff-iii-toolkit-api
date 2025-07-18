@@ -1,16 +1,31 @@
-from datetime import datetime, timedelta
+from dataclasses import dataclass
+from datetime import datetime, timedelta, date
+
+from fireflyiii_enricher_core.firefly_client import SimplifiedItem
 from tabulate import tabulate
 
 
-def _parse_date(raw):
-    raw = raw.lower()
+def _parse_date(raw: str) -> date:
+    raw = raw.strip().lower()
+
     if raw == 'dziś':
-        return datetime.today().strftime('%d-%m-%Y')
-    if raw == 'wczoraj':
-        return (datetime.today() - timedelta(days=1)).strftime('%d-%m-%Y')
+        return date.today()
+    elif raw == 'wczoraj':
+        return date.today() - timedelta(days=1)
+
     try:
+        # Format typu 17.07.25
         parsed = datetime.strptime(raw, '%d.%m.%y')
-        return parsed.strftime('%d-%m-%Y')
+        return parsed.date()
+    except ValueError:
+        pass
+
+    try:
+        # ISO 8601, np. 2025-07-16T09:23:47.86Z
+        if raw.endswith('z'):
+            raw = raw[:-1]
+        parsed = datetime.fromisoformat(raw)
+        return parsed.date()
     except ValueError as exc:
         raise ValueError(f"Nieprawidłowy format daty: {raw}") from exc
 
@@ -23,6 +38,11 @@ def print_txt_data(data):
     headers = ["Data", "Opis", "Odbiorca", "Kwota (PLN)"]
     rows = [[d["date"], d.get("description", ""), d["recipient"], f"{d['amount']:.2f}"] for d in data]
     print(tabulate(rows, headers=headers, tablefmt="grid"))
+
+@dataclass
+class SimplifiedRecord(SimplifiedItem):
+    details:str
+    recipient:str
 
 class TxtParser:
     """Parser tekstów skopiowanych z systemu bankowego"""
@@ -40,7 +60,7 @@ class TxtParser:
         records = []
 
         for i in range(0, len(lines), 5):
-            date_str = _parse_date(lines[i])
+            book_date = _parse_date(lines[i])
             description = lines[i + 1]
             recipient = lines[i + 2]
             amount_str = (
@@ -48,12 +68,12 @@ class TxtParser:
             )
             amount = float(amount_str)
 
-            records.append({
-                "date": date_str,
-                "amount": amount,
-                "details": description,
-                "recipient": recipient
-            })
+            records.append(SimplifiedRecord(
+                date = book_date,
+                amount = amount,
+                details = description,
+                recipient = recipient
+            ))
 
         return records
 
