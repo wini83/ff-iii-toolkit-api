@@ -1,9 +1,9 @@
-from dataclasses import dataclass
+
 from datetime import datetime, timedelta, date
 
-from fireflyiii_enricher_core.firefly_client import SimplifiedItem
 from tabulate import tabulate
 
+from tx_processor import SimplifiedRecord
 
 def _parse_date(raw: str) -> date:
     raw = raw.strip().lower()
@@ -39,10 +39,7 @@ def print_txt_data(data):
     rows = [[d["date"], d.get("description", ""), d["recipient"], f"{d['amount']:.2f}"] for d in data]
     print(tabulate(rows, headers=headers, tablefmt="grid"))
 
-@dataclass
-class SimplifiedRecord(SimplifiedItem):
-    details:str
-    recipient:str
+
 
 class TxtParser:
     """Parser tekstów skopiowanych z systemu bankowego"""
