@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from fireflyiii_enricher_core.firefly_client import FireflyClient
 from tx_processor import TransactionProcessor
 from txt_parser import TxtParser
+from csv_reader import BankCSVReader
 
 logging.basicConfig(
     level=logging.INFO,
@@ -22,15 +23,19 @@ FIREFLY_URL = os.getenv("FIREFLY_URL")
 TOKEN = os.getenv("FIREFLY_TOKEN")
 DESCRIPTION_FILTER = "BLIK - płatność w internecie"
 
-
+TXT = False
 
 
 if __name__ == "__main__":
     logger.info("Start programu Firefly Transaction Tool")
-
     firefly = FireflyClient(FIREFLY_URL, TOKEN)
-    txt_data = TxtParser("alior29072025.txt").parse()
-    processor = TransactionProcessor(firefly, txt_data)
-    processor.process(DESCRIPTION_FILTER, exact_match=False)
+    if TXT:       
+        txt_data = TxtParser("alior29072025.txt").parse()
+
+    else:
+        csv_data = BankCSVReader("Historia_Operacji_2025-11-16_15-12-20.csv").parse()
+        print("Wczytano %d rekordów z CSV" % len(csv_data))
+        processor = TransactionProcessor(firefly, csv_data)
+        processor.process(DESCRIPTION_FILTER, exact_match=False)
 
     logger.info("Zakończono działanie programu")

@@ -1,14 +1,19 @@
 from typing import List, cast
+from dataclasses import dataclass
 
 from fireflyiii_enricher_core.firefly_client import (FireflyClient,
                                                      filter_single_part,
                                                      filter_without_category,
                                                      filter_by_description,
-                                                     simplify_transactions, SimplifiedTx)
+                                                     simplify_transactions, SimplifiedTx,
+                                                     SimplifiedItem)
 from fireflyiii_enricher_core.matcher import TransactionMatcher
 
-from txt_parser import SimplifiedRecord
-
+@dataclass
+class SimplifiedRecord(SimplifiedItem):
+    details:str
+    recipient:str
+    sender:str = ""
 
 class TransactionProcessor:
     """Logika przetwarzania i aktualizacji transakcji"""
@@ -31,7 +36,7 @@ class TransactionProcessor:
             print("   🔍 Możliwe dopasowania z CSV:")
 
             matches = TransactionMatcher.match(tx, self.bank_records)
-
+            print (f"   Znaleziono {len(matches)} dopasowań.")
             if not matches:
                 print("   ⚠️ Brak dopasowań.")
                 continue
@@ -52,16 +57,19 @@ class TransactionProcessor:
                 print(f"      📅 Data: {record.date}")
                 print(f"      💰 Kwota: {record.amount} PLN")
                 print(f"      👤 Nadawca: {sender}")
-                print(f"      🏷️ Odbiorca: {recipient}")
+                print(f"      🏷️ Odbiorca (operator_tx): {recipient}")
                 print(f"      🏷️ Tagi: {tx.tags}")
                 print(f"      📝 Szczegóły: {details}")
-                print(f"          Nowy opis: {tx.description};{recipient}")
+                print(f"          Nowy opis: {tx.description};{details}")
                 choice = input(
                     "      ❓ Czy chcesz zaktualizować opis w Firefly na podstawie tego wpisu? (t/n/q): ").strip().lower()
                 if choice == 't':
                     new_description = f"{tx.description};{recipient}"
                     self.firefly_client.update_transaction_description(
-                        tx.id, new_description
+                        int(tx.id), new_description
+                    )
+                    self.firefly_client.add_tag_to_transaction(
+                        int(tx.id), "blik_done"
                     )
                     break
                 if choice == 'q':
