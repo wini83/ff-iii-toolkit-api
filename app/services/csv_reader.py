@@ -1,5 +1,6 @@
 import csv
 from datetime import date, datetime
+from typing import List
 
 from app.services.tx_processor import SimplifiedRecord
 
@@ -31,7 +32,7 @@ class BankCSVReader:
 
     def parse(self):
         """Czyta dane z CSV i zwraca listę słowników"""
-        records = []
+        records:List[SimplifiedRecord] = []
         with open(self.filename, newline="", encoding="utf-8") as csvfile:
             next(csvfile)
             reader = csv.DictReader(csvfile, delimiter=";")
