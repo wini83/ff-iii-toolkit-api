@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api.file import router as file_router
 from app.api.upload import router as upload_router
 from app.utils.logger import setup_logging
-
+from app.api.auth import router as auth_router
 setup_logging()
 
 
@@ -25,6 +25,10 @@ app.include_router(upload_router)
 app.include_router(file_router)
 
 #app.mount("/", StaticFiles(directory="static", html=True), name="static")
+
+
+app.include_router(auth_router)
+
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 

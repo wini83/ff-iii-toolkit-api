@@ -4,72 +4,141 @@
     <meta charset="UTF-8" />
     <title>Firefly – Podgląd Pliku</title>
 
-    <!-- Tailwind CSS -->
+    <!-- Tailwind -->
     <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@1.9.11"></script>
-
 </head>
 <body class="bg-gray-100 p-6">
-    <div class="max-w-4xl mx-auto bg-white p-6 rounded shadow space-y-6">
-        <h1 class="text-2xl font-bold">Podgląd pliku CSV</h1>
 
-        <div id="fileContainer" class="text-gray-700">
-            Ładowanie pliku...
-        </div>
-    </div>
+<!-- LOGIN PANEL -->
+<div id="loginBox" class="p-4 border rounded bg-gray-50 mb-4">
+    <input id="loginUser" placeholder="user" class="border p-1 mr-2">
+    <input id="loginPass" type="password" placeholder="password" class="border p-1 mr-2">
+    <button id="loginBtn" class="bg-indigo-600 text-white px-3 py-1 rounded">Zaloguj</button>
+    <span id="loginMsg" class="text-red-600 ml-3"></span>
+</div>
 
-    <script>
-        // Pobieramy ID z URL (/file/{id})
+<!-- CSV + MATCH AREA -->
+<div id="mainContent" class="max-w-4xl mx-auto bg-white p-6 rounded shadow space-y-6 hidden">
+    <h1 class="text-2xl font-bold">Podgląd pliku CSV</h1>
+    <div id="fileContainer" class="text-gray-700">Ładowanie pliku...</div>
+</div>
+
+<script>
+// READ TOKEN
+function hasToken() {
+    return !!localStorage.getItem("access_token");
+}
+
+// LOGIN HANDLER
+document.getElementById("loginBtn").addEventListener("click", async () => {
+    const username = loginUser.value;
+    const password = loginPass.value;
+
+    const r = await fetch("/auth/token", {
+        method: "POST",
+        headers: {"Content-Type": "application/x-www-form-urlencoded"},
+        body: new URLSearchParams({username, password})
+    });
+
+    if (!r.ok) {
+        loginMsg.textContent = "Błędne dane";
+        return;
+    }
+
+    const data = await r.json();
+    localStorage.setItem("access_token", data.access_token);
+    location.reload(); // reload -> interceptor starts working
+});
+</script>
+
+<script>
+// JWT INTERCEPTOR
+document.body.addEventListener("htmx:configRequest", (event) => {
+    const token = localStorage.getItem("access_token");
+    if (token) {
+        event.detail.headers['Authorization'] = "Bearer " + token;
+    }
+});
+</script>
+
+<script>
+// ON PAGE LOAD
+document.addEventListener("DOMContentLoaded", () => {
+    if (hasToken()) {
+        // Hide login, show CSV panel
+        document.getElementById("loginBox").classList.add("hidden");
+        document.getElementById("mainContent").classList.remove("hidden");
+
+        // Load CSV data
         const fileId = window.location.pathname.split("/").pop();
-
-        // Pobieramy dane JSON z backendu i ładujemy do #fileContainer
         htmx.ajax("GET", `/api/file/${fileId}`, "#fileContainer");
+    }
+});
+</script>
 
-        // Render JSON → tabela HTML
-        document.body.addEventListener("htmx:afterOnLoad", function(evt) {
-            const target = evt.detail.target.id;
-            const response = evt.detail.xhr.responseText;
+<script>
+// RENDER CSV & MATCH BUTTON
+document.body.addEventListener("htmx:afterOnLoad", (evt) => {
+    const target = evt.detail.target.id;
+    if (target !== "fileContainer") return;
 
-            let data;
-            try { data = JSON.parse(response); }
-            catch { return; }
+    let data;
+    try { data = JSON.parse(evt.detail.xhr.responseText); }
+    catch { return; }
 
-            if (!data.content || target !== "fileContainer") return;
+    if (!data.content) return;
 
-            const rows = data.content;
+    const rows = data.content;
+    const fileId = window.location.pathname.split("/").pop();
 
-            let html = `
-                <h2 class="text-xl font-bold mb-2">CSV (${rows.length} rekordów)</h2>
+    let html = `
+        <h2 class="text-xl font-bold mb-2">CSV (${rows.length} rekordów)</h2>
+        <table class="min-w-full border">
+            <thead>
+                <tr>
+                    <th class="border px-2 py-1">Data</th>
+                    <th class="border px-2 py-1">Kwota</th>
+                    <th class="border px-2 py-1">Szczegóły</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${rows.map(r => `
+                    <tr class="hover:bg-gray-50">
+                        <td class="border px-2 py-1">${r.date ?? ""}</td>
 
-                <table class="min-w-full border">
-                    <thead>
-                        <tr>
-                            ${Object.keys(rows[0]).map(h => `<th class='border px-2 py-1'>${h}</th>`).join("")}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${rows.map(r => `
-                            <tr class="hover:bg-gray-50">
-                                ${Object.values(r).map(v => `<td class='border px-2 py-1'>${v}</td>`).join("")}
-                            </tr>
-                        `).join("")}
-                    </tbody>
-                </table>
+                        <td class="border px-2 py-1">
+                            ${r.amount ?? ""}${r.account_currency ?? ""}<br>
+                            (${r.operation_amount ?? ""}${r.operation_currency ?? ""})
+                        </td>
 
-                <div class="mt-4">
-                    <a href="/file/do-match/${fileId}"
-                       hx-get="/api/file/do-match/${fileId}"
-                       hx-target="#fileContainer"
-                       class="bg-blue-600 text-white px-4 py-2 rounded inline-block">
-                        Matchuj transakcje
-                    </a>
-                </div>
-            `;
+                        <td class="border px-2 py-1">
+                            <b>Szczegóły:</b> ${r.details ?? ""}<br>
+                            <b>Odbiorca:</b> ${r.recipient ?? ""}<br>
+                            <b>Konto odbiorcy:</b> ${r.recipient_account ?? ""}<br>
+                            <b>Nadawca:</b> ${r.sender ?? ""}<br>
+                            <b>Konto nadawcy:</b> ${r.sender_account ?? ""}<br>
+                        </td>
 
-            document.querySelector("#fileContainer").innerHTML = html;
-        });
-    </script>
+                        
+                    </tr>`).join('')}
+            </tbody>
+        </table>
+
+        <div class="mt-4">
+            <button 
+                hx-get="/api/file/do-match/${fileId}"
+                hx-target="#fileContainer"
+                class="bg-blue-600 text-white px-4 py-2 rounded">
+                Matchuj transakcje
+            </button>
+        </div>`;
+    
+    document.getElementById("fileContainer").innerHTML = html;
+});
+</script>
+
 </body>
 </html>

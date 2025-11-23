@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
     <meta charset="UTF-8" />
-    <title>Firefly Matcher</title>
+    <title>Firefly III Alior BLIK Tool</title>
 
     <!-- Tailwind CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -13,18 +13,7 @@
 <body class="bg-gray-100 p-8">
     <div class="max-w-4xl mx-auto bg-white p-6 rounded shadow space-y-6">
         <h1 class="text-2xl font-bold">Firefly Alior BLIK tool</h1>
-
-        <input id="tokenInput" type="text" placeholder="X-Token" class="border p-1">
-
-        <script>
-            document.body.addEventListener('htmx:configRequest', (event) => {
-                const tokenValue = document.querySelector('#tokenInput').value;
-                if (tokenValue) {
-                    event.detail.headers['X-Token'] = tokenValue;
-                }
-            });
-        </script>
-
+       
         <!-- Upload CSV -->
         <form hx-post="/upload-csv" hx-target="#uploadResult" hx-swap="innerHTML" enctype="multipart/form-data">
             <div class="flex items-center space-x-4">
@@ -74,6 +63,38 @@ document.body.addEventListener("htmx:afterOnLoad", function (evt) {
     } catch (e) {
         console.error("Not a JSON response");
     }
+});
+</script>
+
+<!-- LOGIN -->
+<div id="loginBox" class="p-4">
+  <input id="loginUser" placeholder="user" class="border p-1 mr-2" />
+  <input id="loginPass" placeholder="password" type="password" class="border p-1 mr-2" />
+  <button id="loginBtn" class="bg-indigo-600 text-white px-3 py-1 rounded">Zaloguj</button>
+  <span id="loginMsg" class="ml-3 text-sm text-red-500"></span>
+</div>
+
+<script>
+document.getElementById("loginBtn").addEventListener("click", async () => {
+    const user = document.getElementById("loginUser").value;
+    const pass = document.getElementById("loginPass").value;
+    const body = new URLSearchParams();
+    body.append("username", user);
+    body.append("password", pass);
+
+    const r = await fetch("/auth/token", {
+        method: "POST",
+        headers: {"Content-Type": "application/x-www-form-urlencoded"},
+        body: body.toString()
+    });
+
+    if (!r.ok) {
+        document.getElementById("loginMsg").textContent = "Błąd logowania";
+        return;
+    }
+    const j = await r.json();
+    localStorage.setItem("access_token", j.access_token);
+    document.getElementById("loginMsg").textContent = "zalogowano";
 });
 </script>
 

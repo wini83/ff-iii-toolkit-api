@@ -8,7 +8,7 @@ from fireflyiii_enricher_core.firefly_client import FireflyClient
 from pydantic import BaseModel
 
 from app.config import DESCRIPTION_FILTER, FIREFLY_TOKEN, FIREFLY_URL, TAG_BLIK_DONE
-from app.services.auth import verify_token
+from app.services.auth import get_current_user
 from app.services.csv_reader import BankCSVReader
 from app.services.tx_processor import MatchResult, TransactionProcessor
 from app.utils.encoding import decode_base64url
@@ -23,7 +23,7 @@ class ApplyPayload(BaseModel):
     csv_indexes: list[int]
 
 
-@router.get("/{encoded_id}", dependencies=[Depends(verify_token)])
+@router.get("/{encoded_id}", dependencies=[Depends(get_current_user)])
 async def get_tempfile(encoded_id: str):
     try:
         print(f"cache items before: {len(MEM_MATCHES)}")
@@ -51,7 +51,7 @@ async def get_tempfile(encoded_id: str):
         raise HTTPException(status_code=500, detail="Invalid or corrupted id")
 
 
-@router.get("/do-match/{encoded_id}", dependencies=[Depends(verify_token)])
+@router.get("/do-match/{encoded_id}", dependencies=[Depends(get_current_user)])
 async def do_match(encoded_id: str):
     print(f"cache items before: {len(MEM_MATCHES)}")
     decoded = decode_base64url(encoded_id)
