@@ -1,3 +1,18 @@
+## 0.4.0 (2025-11-27)
+
+### Feat
+
+- **frontend**: first working prototype
+
+### Refactor
+
+- **frontend**: improved ui
+- **frontend**: new template introduced
+- **frontend**: new template (wip)
+- **frontend**: WIP
+- **frontend**: new "file" endpoint
+- **api+frontend**: -introduction of a new frontend file endpoint
+
 ## 0.3.0 (2025-11-22)
 
 ### Feat
