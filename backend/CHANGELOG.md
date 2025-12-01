@@ -1,3 +1,9 @@
+## 0.4.3 (2025-12-01)
+
+### Refactor
+
+- **api**: introduce typed Pydantic response models for file and upload endpoints
+
 ## 0.4.2 (2025-11-30)
 
 ### Fix
