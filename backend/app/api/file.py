@@ -3,7 +3,7 @@ import os
 import tempfile
 from typing import Dict, List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fireflyiii_enricher_core.firefly_client import FireflyClient
 from pydantic import BaseModel
 
@@ -11,14 +11,20 @@ from app.config import (DESCRIPTION_FILTER, FIREFLY_TOKEN, FIREFLY_URL,
                         TAG_BLIK_DONE)
 from app.services.auth import get_current_user
 from app.services.csv_reader import BankCSVReader
-from app.services.tx_processor import MatchResult, TransactionProcessor
-from app.utils.encoding import decode_base64url
-from app.services.tx_processor import SimplifiedRecord
+from app.services.tx_processor import (MatchResult, SimplifiedRecord,
+                                       TransactionProcessor)
+from app.utils.encoding import decode_base64url, encode_base64url
 
 router = APIRouter(prefix="/api/file", tags=["files"])
 logger = logging.getLogger(__name__)
 
 MEM_MATCHES: Dict[str, List[MatchResult]] = {}
+
+
+class UploadResponse(BaseModel):
+    message: str
+    count: int
+    id: str
 
 
 class ApplyPayload(BaseModel):
@@ -31,6 +37,7 @@ class FilePreviewResponse(BaseModel):
     size: int
     content: List[SimplifiedRecord]
 
+
 class FileMatchResponse(BaseModel):
     file_id: str
     decoded_name: str
@@ -41,14 +48,35 @@ class FileMatchResponse(BaseModel):
     transactions_with_many_matches: int
     content: List[MatchResult]
 
+
 class FileApplyResponse(BaseModel):
     file_id: str
     updated: int
     errors: List[str]
 
 
+@router.post("", dependencies=[Depends(get_current_user)])
+async def upload_csv(file: UploadFile = File(...)) -> UploadResponse:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp:
+        content = await file.read()
+        tmp.write(content)
+        tmp_path = tmp.name
+
+    records = BankCSVReader(tmp_path).parse()
+
+    filename = os.path.basename(tmp_path)
+    file_id = os.path.splitext(filename)[0]  # tmpXXXX
+    encoded = encode_base64url(file_id)
+
+    return UploadResponse(
+        message="File uploaded successfully",
+        count=len(records),
+        id=encoded,
+    )
+
+
 @router.get("/{encoded_id}", dependencies=[Depends(get_current_user)])
-async def get_tempfile(encoded_id: str)-> FilePreviewResponse:
+async def get_tempfile(encoded_id: str) -> FilePreviewResponse:
     try:
         print(f"cache items before: {len(MEM_MATCHES)}")
         decoded = decode_base64url(encoded_id)
@@ -65,10 +93,10 @@ async def get_tempfile(encoded_id: str)-> FilePreviewResponse:
         csv_data = BankCSVReader(full_path).parse()
 
         return FilePreviewResponse(
-            file_id= encoded_id,
-            decoded_name= decoded,
-            size= len(csv_data),
-            content= csv_data,
+            file_id=encoded_id,
+            decoded_name=decoded,
+            size=len(csv_data),
+            content=csv_data,
         )
 
     except Exception:
@@ -106,19 +134,19 @@ async def do_match(encoded_id: str) -> FileMatchResponse:
 
     MEM_MATCHES[encoded_id] = report
 
-    return FileMatchResponse (
-        file_id= encoded_id,
-        decoded_name = decoded,
-        records_in_file = len(csv_data),
-        transactions_found= len(report),
-        transactions_not_matched= not_matched,
-        transactions_with_one_match= with_one_match,
-        transactions_with_many_matches= with_many_matches,
+    return FileMatchResponse(
+        file_id=encoded_id,
+        decoded_name=decoded,
+        records_in_file=len(csv_data),
+        transactions_found=len(report),
+        transactions_not_matched=not_matched,
+        transactions_with_one_match=with_one_match,
+        transactions_with_many_matches=with_many_matches,
         content=report,
     )
 
 
-@router.post("/apply_match/{encoded_id}")
+@router.post("/apply_match/{encoded_id}", dependencies=[Depends(get_current_user)])
 async def apply_matches(encoded_id: str, payload: ApplyPayload):
     if encoded_id not in MEM_MATCHES:
         raise HTTPException(status_code=400, detail="No match data found")
@@ -156,4 +184,4 @@ async def apply_matches(encoded_id: str, payload: ApplyPayload):
             updated += 1
         except RuntimeError as e:
             errors.append(f"Error updating transaction id {match.tx.id}: {str(e)}")
-    return FileApplyResponse(file_id=encoded_id, updated = updated, errors = errors)
+    return FileApplyResponse(file_id=encoded_id, updated=updated, errors=errors)

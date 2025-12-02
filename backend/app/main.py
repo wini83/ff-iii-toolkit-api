@@ -1,20 +1,20 @@
 import tomllib
 
 from fastapi import APIRouter, FastAPI
-from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 
-from app.settings import settings
 from app.api.auth import router as auth_router
 from app.api.file import router as file_router
 from app.api.upload import router as upload_router
-from app.routers.file import router as file_ui_router
+from app.settings import settings
 from app.utils.logger import setup_logging
-from fastapi.middleware.cors import CORSMiddleware
 
 setup_logging()
 
+class HealthCheck(BaseModel):
+    status: str = "OK"
 
 def get_version() -> str:
     with open("pyproject.toml", "rb") as f:
@@ -22,16 +22,19 @@ def get_version() -> str:
     return data["project"]["version"]
 
 
+
 APP_VERSION = get_version()
 
-app = FastAPI(title="Firefly III Alior BLIK Tool", version=APP_VERSION)
+print(f"Settings loaded DEMO_MODE={settings.DEMO_MODE}")
+
+app = FastAPI(title="Firefly III Toolkit", version=APP_VERSION)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
 )
 
 router = APIRouter()
@@ -41,13 +44,7 @@ templates = Jinja2Templates("templates")
 app.include_router(auth_router)
 app.include_router(upload_router)
 app.include_router(file_router)
-app.include_router(file_ui_router)
 
-
-
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-
-app.get("/health")
-async def health_check():
-    return {"status": "ok"}
+@app.get("/api/health", response_model=HealthCheck, tags=["health"])
+async def health_check() -> HealthCheck:
+    return HealthCheck()
