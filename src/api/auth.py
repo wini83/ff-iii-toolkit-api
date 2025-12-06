@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 
-from app.settings import settings
+from src.settings import settings
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 

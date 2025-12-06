@@ -1,4 +1,3 @@
-# app/services/auth.py
 import os
 
 import jwt

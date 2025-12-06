@@ -7,13 +7,13 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fireflyiii_enricher_core.firefly_client import FireflyClient
 from pydantic import BaseModel
 
-from app.config import (DESCRIPTION_FILTER, FIREFLY_TOKEN, FIREFLY_URL,
+from src.config import (DESCRIPTION_FILTER, FIREFLY_TOKEN, FIREFLY_URL,
                         TAG_BLIK_DONE)
-from app.services.auth import get_current_user
-from app.services.csv_reader import BankCSVReader
-from app.services.tx_processor import (MatchResult, SimplifiedRecord,
+from src.services.auth import get_current_user
+from src.services.csv_reader import BankCSVReader
+from src.services.tx_processor import (MatchResult, SimplifiedRecord,
                                        TransactionProcessor)
-from app.utils.encoding import decode_base64url, encode_base64url
+from src.utils.encoding import decode_base64url, encode_base64url
 
 router = APIRouter(prefix="/api/file", tags=["files"])
 logger = logging.getLogger(__name__)

@@ -5,11 +5,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from app.api.auth import router as auth_router
-from app.api.file import router as file_router
-from app.api.upload import router as upload_router
-from app.settings import settings
-from app.utils.logger import setup_logging
+from src.api.auth import router as auth_router
+from src.api.file import router as file_router
+from src.api.upload import router as upload_router
+from src.settings import settings
+from src.utils.logger import setup_logging
 
 setup_logging()
 
@@ -25,7 +25,7 @@ def get_version() -> str:
 
 APP_VERSION = get_version()
 
-print(f"Settings loaded DEMO_MODE={settings.DEMO_MODE}")
+print(f"Settings loaded, DEMO_MODE={settings.DEMO_MODE}")
 
 app = FastAPI(title="Firefly III Toolkit", version=APP_VERSION)
 

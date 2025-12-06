@@ -4,9 +4,9 @@ import tempfile
 from fastapi import APIRouter, Depends, File, UploadFile
 from pydantic import BaseModel
 
-from app.services.auth import get_current_user
-from app.services.csv_reader import BankCSVReader
-from app.utils.encoding import encode_base64url
+from src.services.auth import get_current_user
+from src.services.csv_reader import BankCSVReader
+from src.utils.encoding import encode_base64url
 
 router = APIRouter(prefix="/api/upload-csv", tags=["upload"])
 
