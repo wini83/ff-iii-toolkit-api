@@ -29,8 +29,20 @@ logger = logging.getLogger(__name__)
 MEM_MATCHES: Dict[str, List[MatchResult]] = {}
 
 
-@router.post("", dependencies=[Depends(get_current_user)])
-async def upload_csv(file: UploadFile = File(...)) -> UploadResponse:
+@router.post("",
+             dependencies=[Depends(get_current_user)],
+             response_model=UploadResponse)
+async def upload_csv(file: UploadFile = File(...)):
+    """
+    Upload a CSV file and parse its contents. The file is stored temporarily for further processing.
+     Returns an UploadResponse containing the number of records parsed and a unique file ID.
+
+    Args:
+        file (UploadFile): The CSV file to be uploaded.
+
+    Returns:
+        UploadResponse: Response containing message, count of records, and encoded file ID.
+    """
     with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp:
         content = await file.read()
         tmp.write(content)
@@ -49,8 +61,19 @@ async def upload_csv(file: UploadFile = File(...)) -> UploadResponse:
     )
 
 
-@router.get("/{encoded_id}", dependencies=[Depends(get_current_user)])
-async def get_tempfile(encoded_id: str) -> FilePreviewResponse:
+
+@router.get("/{encoded_id}",
+            dependencies=[Depends(get_current_user)],
+            response_model=FilePreviewResponse)
+async def get_tempfile(encoded_id: str):
+    """
+    Retrieve and preview the contents of an uploaded CSV file by its encoded ID.
+
+    Args:
+        encoded_id (str): The base64url encoded ID of the uploaded file.
+    
+    Returns:
+        FilePreviewResponse: Response containing file details and parsed content."""
     try:
         print(f"cache items before: {len(MEM_MATCHES)}")
         decoded = decode_base64url(encoded_id)
@@ -77,8 +100,19 @@ async def get_tempfile(encoded_id: str) -> FilePreviewResponse:
         raise HTTPException(status_code=500, detail="Invalid or corrupted id")
 
 
-@router.get("/{encoded_id}/matches", dependencies=[Depends(get_current_user)])
-async def do_match(encoded_id: str) -> FileMatchResponse:
+@router.get("/{encoded_id}/matches",
+            dependencies=[Depends(get_current_user)],
+            response_model=FileMatchResponse)
+async def do_match(encoded_id: str):
+    """
+    Process the uploaded CSV file to find matching transactions in Firefly III.
+    
+    Args:
+        encoded_id (str): The base64url encoded ID of the uploaded file.
+        
+    Returns:
+    FileMatchResponse: Response containing match results and statistics.
+    """
     print(f"cache items before: {len(MEM_MATCHES)}")
     decoded = decode_base64url(encoded_id)
 
@@ -120,8 +154,20 @@ async def do_match(encoded_id: str) -> FileMatchResponse:
     )
 
 
-@router.post("/{encoded_id}/matches", dependencies=[Depends(get_current_user)])
-async def apply_matches(encoded_id: str, payload: ApplyPayload) -> FileApplyResponse:
+@router.post("/{encoded_id}/matches",
+              dependencies=[Depends(get_current_user)],
+              response_model=FileApplyResponse)
+async def apply_matches(encoded_id: str, payload: ApplyPayload):
+    """
+    Apply selected matches to the transactions in Firefly III.
+
+    Args:
+        encoded_id (str): The base64url encoded ID of the uploaded file.
+        payload (ApplyPayload): Payload containing the list of CSV indexes to apply.
+
+    Returns:
+        FileApplyResponse: Response containing the number of updated transactions and any errors.
+    """
     if encoded_id not in MEM_MATCHES:
         raise HTTPException(status_code=400, detail="No match data found")
     data = MEM_MATCHES[encoded_id]
@@ -130,7 +176,7 @@ async def apply_matches(encoded_id: str, payload: ApplyPayload) -> FileApplyResp
 
     to_update: List[MatchResult] = []
 
-    for req_id in payload.csv_indexes:
+    for req_id in payload.tx_indexes:
         item = index.get(req_id)
         if not item:
             raise HTTPException(

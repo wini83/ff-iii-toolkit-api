@@ -12,7 +12,7 @@ class UploadResponse(BaseModel):
 
 
 class ApplyPayload(BaseModel):
-    csv_indexes: list[int]
+    tx_indexes: list[int]
 
 
 class FilePreviewResponse(BaseModel):

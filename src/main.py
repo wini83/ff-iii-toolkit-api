@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from src.api.routers.auth import router as auth_router
 from src.api.routers.blik_files import router as blik_router
-from src.api.routers.system import router as system_router
+from src.api.routers.system import router as system_router, init_system_router
 from src.settings import settings
 from src.utils.logger import setup_logging
 
@@ -16,6 +16,7 @@ setup_logging()
 def get_version() -> str:
     with open("pyproject.toml", "rb") as f:
         data = tomllib.load(f)
+        init_system_router(data["project"]["version"])
     return data["project"]["version"]
 
 
@@ -35,9 +36,6 @@ app.add_middleware(
 
 
 app.include_router(auth_router)
-#app.include_router(upload_router)
-#app.include_router(file_router)
-
 app.include_router(blik_router)
 app.include_router(system_router)
 
