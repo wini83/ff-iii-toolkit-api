@@ -7,52 +7,26 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fireflyiii_enricher_core.firefly_client import FireflyClient
 from pydantic import BaseModel
 
-from src.config import (DESCRIPTION_FILTER, FIREFLY_TOKEN, FIREFLY_URL,
-                        TAG_BLIK_DONE)
+from src.api.models.blik_files import (
+    ApplyPayload,
+    FileApplyResponse,
+    FileMatchResponse,
+    FilePreviewResponse,
+    UploadResponse,
+)
+from src.config import DESCRIPTION_FILTER, FIREFLY_TOKEN, FIREFLY_URL, TAG_BLIK_DONE
 from src.services.auth import get_current_user
 from src.services.csv_reader import BankCSVReader
-from src.services.tx_processor import (MatchResult, SimplifiedRecord,
-                                       TransactionProcessor)
+from src.services.tx_processor import (
+    MatchResult,
+    TransactionProcessor,
+)
 from src.utils.encoding import decode_base64url, encode_base64url
 
-router = APIRouter(prefix="/api/file", tags=["files"])
+router = APIRouter(prefix="/api/blik_files", tags=["blik-files"])
 logger = logging.getLogger(__name__)
 
 MEM_MATCHES: Dict[str, List[MatchResult]] = {}
-
-
-class UploadResponse(BaseModel):
-    message: str
-    count: int
-    id: str
-
-
-class ApplyPayload(BaseModel):
-    csv_indexes: list[int]
-
-
-class FilePreviewResponse(BaseModel):
-    file_id: str
-    decoded_name: str
-    size: int
-    content: List[SimplifiedRecord]
-
-
-class FileMatchResponse(BaseModel):
-    file_id: str
-    decoded_name: str
-    records_in_file: int
-    transactions_found: int
-    transactions_not_matched: int
-    transactions_with_one_match: int
-    transactions_with_many_matches: int
-    content: List[MatchResult]
-
-
-class FileApplyResponse(BaseModel):
-    file_id: str
-    updated: int
-    errors: List[str]
 
 
 @router.post("", dependencies=[Depends(get_current_user)])
@@ -103,7 +77,7 @@ async def get_tempfile(encoded_id: str) -> FilePreviewResponse:
         raise HTTPException(status_code=500, detail="Invalid or corrupted id")
 
 
-@router.get("/do-match/{encoded_id}", dependencies=[Depends(get_current_user)])
+@router.get("/{encoded_id}/matches", dependencies=[Depends(get_current_user)])
 async def do_match(encoded_id: str) -> FileMatchResponse:
     print(f"cache items before: {len(MEM_MATCHES)}")
     decoded = decode_base64url(encoded_id)
@@ -146,7 +120,7 @@ async def do_match(encoded_id: str) -> FileMatchResponse:
     )
 
 
-@router.post("/apply_match/{encoded_id}", dependencies=[Depends(get_current_user)])
+@router.post("/{encoded_id}/matches", dependencies=[Depends(get_current_user)])
 async def apply_matches(encoded_id: str, payload: ApplyPayload) -> FileApplyResponse:
     if encoded_id not in MEM_MATCHES:
         raise HTTPException(status_code=400, detail="No match data found")

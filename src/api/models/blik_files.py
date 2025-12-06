@@ -1,0 +1,39 @@
+from typing import List
+
+from pydantic import BaseModel
+
+from src.services.tx_processor import MatchResult, SimplifiedRecord
+
+
+class UploadResponse(BaseModel):
+    message: str
+    count: int
+    id: str
+
+
+class ApplyPayload(BaseModel):
+    csv_indexes: list[int]
+
+
+class FilePreviewResponse(BaseModel):
+    file_id: str
+    decoded_name: str
+    size: int
+    content: List[SimplifiedRecord]
+
+
+class FileMatchResponse(BaseModel):
+    file_id: str
+    decoded_name: str
+    records_in_file: int
+    transactions_found: int
+    transactions_not_matched: int
+    transactions_with_one_match: int
+    transactions_with_many_matches: int
+    content: List[MatchResult]
+
+
+class FileApplyResponse(BaseModel):
+    file_id: str
+    updated: int
+    errors: List[str]

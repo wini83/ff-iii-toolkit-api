@@ -1,14 +1,16 @@
 from dataclasses import dataclass, fields
 from typing import List, cast
 
-from fireflyiii_enricher_core.firefly_client import (FireflyClient,
-                                                     SimplifiedItem,
-                                                     SimplifiedTx,
-                                                     filter_by_description,
-                                                     filter_single_part,
-                                                     filter_without_category,
-                                                     filter_without_tag,
-                                                     simplify_transactions)
+from fireflyiii_enricher_core.firefly_client import (
+    FireflyClient,
+    SimplifiedItem,
+    SimplifiedTx,
+    filter_by_description,
+    filter_single_part,
+    filter_without_category,
+    filter_without_tag,
+    simplify_transactions,
+)
 from fireflyiii_enricher_core.matcher import TransactionMatcher
 
 

@@ -1,21 +1,16 @@
 import tomllib
 
-from fastapi import APIRouter, FastAPI
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from src.api.auth import router as auth_router
-from src.api.file import router as file_router
-from src.api.upload import router as upload_router
+from src.api.routers.auth import router as auth_router
+from src.api.routers.blik_files import router as blik_router
+from src.api.routers.system import router as system_router
 from src.settings import settings
 from src.utils.logger import setup_logging
 
 setup_logging()
-
-
-class HealthCheck(BaseModel):
-    status: str = "OK"
 
 
 def get_version() -> str:
@@ -38,15 +33,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-router = APIRouter()
-templates = Jinja2Templates("templates")
-
 
 app.include_router(auth_router)
-app.include_router(upload_router)
-app.include_router(file_router)
+#app.include_router(upload_router)
+#app.include_router(file_router)
 
+app.include_router(blik_router)
+app.include_router(system_router)
 
-@app.get("/api/health", response_model=HealthCheck, tags=["health"])
-async def health_check() -> HealthCheck:
-    return HealthCheck()
