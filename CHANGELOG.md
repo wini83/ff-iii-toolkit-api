@@ -1,3 +1,10 @@
+## 0.4.5 (2025-12-06)
+
+### Refactor
+
+- **api**: migrate backend to a clean src-based project layout and update imports
+- **api**: -add response model to allpy matches endpoint
+
 ## 0.4.4 (2025-12-02)
 
 ### Refactor
