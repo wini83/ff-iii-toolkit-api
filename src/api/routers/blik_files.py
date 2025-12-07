@@ -14,7 +14,7 @@ from src.api.models.blik_files import (
     FilePreviewResponse,
     UploadResponse,
 )
-from src.config import DESCRIPTION_FILTER, FIREFLY_TOKEN, FIREFLY_URL, TAG_BLIK_DONE
+from src.settings import settings
 from src.services.auth import get_current_user
 from src.services.csv_reader import BankCSVReader
 from src.services.tx_processor import (
@@ -127,14 +127,17 @@ async def do_match(encoded_id: str):
 
     csv_data = BankCSVReader(full_path).parse()
 
-    if not FIREFLY_URL or not FIREFLY_TOKEN:
+    if not settings.FIREFLY_URL or not settings.FIREFLY_TOKEN:
         logger.error("Missing FIREFLY_URL or FIREFLY_TOKEN")
         raise HTTPException(status_code=500, detail="Config error")
 
-    firefly = FireflyClient(FIREFLY_URL, FIREFLY_TOKEN)
+    firefly = FireflyClient(settings.FIREFLY_URL, settings.FIREFLY_TOKEN)
     processor = TransactionProcessor(firefly)
     report = processor.match(
-        csv_data, DESCRIPTION_FILTER, exact_match=False, tag=TAG_BLIK_DONE
+        csv_data,
+        settings.BLIK_DESCRIPTION_FILTER, 
+        exact_match=False,
+        tag=settings.TAG_BLIK_DONE
     )
     not_matched = len([r for r in report if not r.matches])
     with_one_match = len([r for r in report if len(r.matches) == 1])
@@ -190,11 +193,11 @@ async def apply_matches(encoded_id: str, payload: ApplyPayload):
                 status_code=400,
                 detail=f"Transaction id {match.tx.id} does not have exactly one match",
             )
-    if not FIREFLY_URL or not FIREFLY_TOKEN:
+    if not settings.FIREFLY_URL or not settings.FIREFLY_TOKEN:
         logger.error("Missing FIREFLY_URL or FIREFLY_TOKEN")
         raise HTTPException(status_code=500, detail="Config error")
 
-    firefly = FireflyClient(FIREFLY_URL, FIREFLY_TOKEN)
+    firefly = FireflyClient(settings.FIREFLY_URL, settings.FIREFLY_TOKEN)
     processor = TransactionProcessor(firefly)
     updated = 0
     errors = []

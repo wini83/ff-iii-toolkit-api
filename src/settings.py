@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "not_set"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    BLIK_DESCRIPTION_FILTER:str = "BLIK - płatność w internecie"
+    TAG_BLIK_DONE:str = "blik_done"
 
     class Config:
         env_file = ENV_PATH
