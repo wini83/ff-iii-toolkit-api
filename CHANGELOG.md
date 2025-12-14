@@ -128,6 +128,17 @@
 - **api**: - extract upload and file endpoints into separate routers - move csv parsing and transaction processing to services/ - add centralized logging and encoding utilities - introduce config module for env settings - create clean app entrypoint with router registration - improve project structure for scalability and maintainability
 - **all**: black isort ruff
 
+## v2.1.0 (2025-12-14)
+
+### Feat
+
+- **blik**: introduce stats and share models with pandas
+- **blik**: improve record pretty print and refresh docs
+
+### Fix
+
+- **blik**: removed git artifacts
+
 ## v2.0.1 (2025-12-13)
 
 ### Fix
