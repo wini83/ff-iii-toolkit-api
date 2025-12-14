@@ -1,4 +1,5 @@
 # Firefly III Toolkit API
+[![Build & Publish Docker Image](https://github.com/wini83/ff-iii-toolkit-api/actions/workflows/build.yml/badge.svg)](https://github.com/wini83/ff-iii-toolkit-api/actions/workflows/build.yml)
 
 Backend FastAPI do polautomatycznego matchowania i aktualizowania transakcji BLIK w Firefly III na podstawie plikow CSV z banku. Pozwala wrzucic wyciag, zobaczyc co pasuje do transakcji w Firefly, a nastepnie hurtowo uzupelnic opisy/notatki i oznaczyc transakcje tagiem.
 
