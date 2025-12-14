@@ -1,6 +1,7 @@
-from dataclasses import dataclass, fields
-from typing import List, cast, Iterable
+from typing import List, cast
 
+import pandas as pd
+from anyio import to_thread
 from fireflyiii_enricher_core.firefly_client import (
     FireflyClient,
     SimplifiedItem,
@@ -13,65 +14,42 @@ from fireflyiii_enricher_core.firefly_client import (
 )
 from fireflyiii_enricher_core.matcher import TransactionMatcher
 
-
-@dataclass
-class SimplifiedRecord(SimplifiedItem):
-    details: str
-    recipient: str
-    operation_amount: float
-    sender: str = ""
-    operation_currency: str = "PLN"
-    account_currency: str = "PLN"
-    sender_account: str = ""
-    recipient_account: str = ""
-
-    def pretty_print(
-        self,
-        *,
-        only_meaningful: bool = False,
-        include: Iterable[str] | None = None,
-        exclude: Iterable[str] | None = None,
-    ) -> str:
-        include = set(include) if include else None
-        exclude = set(exclude or [])
-
-        def is_meaningful(value) -> bool:
-            if value is None:
-                return False
-            if isinstance(value, str):
-                return value.strip() != ""
-            if isinstance(value, (int, float)):
-                return value != 0
-            return True
-
-        lines = []
-        for f in fields(self):
-            name = f.name
-            value = getattr(self, name)
-
-            if include is not None:
-                if name not in include:
-                    continue
-            elif name in exclude:
-                continue
-            elif only_meaningful and not is_meaningful(value):
-                continue
-
-            lines.append(f"{name}: {value}")
-
-        return "\n".join(lines)
-
-
-@dataclass
-class MatchResult:
-    tx: SimplifiedTx
-    matches: List[SimplifiedRecord]
+from api.models.blik_files import MatchResult, SimplifiedRecord, StatisticsResponse
+from settings import settings
 
 
 def add_line(existing: str | None, new_line: str) -> str:
     if existing:
         return existing + "\n" + new_line
     return new_line
+
+
+def txs_to_df(txs: list[SimplifiedTx]) -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "date": tx.date,
+            "tags": tx.tags,
+        }
+        for tx in txs
+    )
+
+
+def _group_not_processed_sync(txs: List[SimplifiedTx]) -> dict[str, int]:
+    if not txs:
+        return {}
+    df = txs_to_df(txs)
+
+    # YYYY-MM z daty
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df["month"] = df["date"].dt.to_period("M").astype(str)  # type: ignore[attr-defined]
+
+    return df.groupby("month").size().sort_index().to_dict()
+
+
+async def group_not_processed_by_month(
+    txs: List[SimplifiedTx],
+) -> dict[str, int]:
+    return await to_thread.run_sync(_group_not_processed_sync, txs)
 
 
 class TransactionProcessor:
@@ -111,8 +89,46 @@ class TransactionProcessor:
 
     def apply_match(self, tx: SimplifiedTx, record: SimplifiedRecord):
         new_description = f"{tx.description};{record.details}"
-        #TODO: uniknąć duplikatów w opisie
+        # TODO: uniknąć duplikatów w opisie
         self.firefly_client.update_transaction_description(int(tx.id), new_description)
         notes = add_line(tx.notes, record.pretty_print(only_meaningful=True))
         self.firefly_client.update_transaction_notes(int(tx.id), notes)
         self.firefly_client.add_tag_to_transaction(int(tx.id), "blik_done")
+
+    async def get_stats(
+        self, description_filter: str, tag_done: str
+    ) -> StatisticsResponse:
+        raw_txs = self.firefly_client.fetch_transactions()
+        single = filter_single_part(raw_txs)
+        uncategorized = filter_without_category(single)
+        filtered_by_desc_exact = filter_by_description(
+            uncategorized, description_filter, True
+        )
+        filtered_by_desc_partial = filter_by_description(
+            uncategorized, description_filter, False
+        )
+
+        incomplete_procesed = simplify_transactions(filtered_by_desc_partial)
+        simplified = simplify_transactions(filtered_by_desc_exact)
+
+        not_processed = [
+            tx
+            for tx in simplified
+            if not tx.tags or settings.TAG_BLIK_DONE not in tx.tags
+        ]
+
+        not_processed_by_month = await group_not_processed_by_month(not_processed)
+        incomplete_procesed_by_month = await group_not_processed_by_month(
+            incomplete_procesed
+        )
+
+        return StatisticsResponse(
+            total_transactions=len(raw_txs),
+            single_part_transactions=len(single),
+            uncategorized_transactions=len(uncategorized),
+            filtered_by_description_exact=len(filtered_by_desc_exact),
+            filtered_by_description_partial=len(filtered_by_desc_partial),
+            not_processed_transactions=len(not_processed),
+            not_processed_by_month=not_processed_by_month,
+            inclomplete_procesed_by_month=incomplete_procesed_by_month,
+        )

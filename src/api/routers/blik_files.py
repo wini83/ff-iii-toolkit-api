@@ -1,29 +1,23 @@
-from collections import defaultdict
 import logging
 import os
 import tempfile
+from collections import defaultdict
 from typing import Dict, List
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fireflyiii_enricher_core.firefly_client import (
-    FireflyClient,
-    filter_single_part,
-    filter_without_category,
-    filter_by_description,
-    simplify_transactions,
-)
+from fireflyiii_enricher_core.firefly_client import FireflyClient
 
 from api.models.blik_files import (
     ApplyPayload,
     FileApplyResponse,
     FileMatchResponse,
     FilePreviewResponse,
-    UploadResponse,
     StatisticsResponse,
+    UploadResponse,
 )
 from services.auth import get_current_user
 from services.csv_reader import BankCSVReader
-from services.tx_processor import MatchResult, TransactionProcessor, SimplifiedTx
+from services.tx_processor import MatchResult, SimplifiedTx, TransactionProcessor
 from settings import settings
 from utils.encoding import decode_base64url, encode_base64url
 
@@ -50,32 +44,18 @@ def group_by_month(txs: list[SimplifiedTx], tag: str):
     return dict(grouped)
 
 
-@router.get("/statistics", dependencies=[Depends(get_current_user)])
+@router.get(
+    "/statistics",
+    dependencies=[Depends(get_current_user)],
+    response_model=StatisticsResponse,
+)
 async def get_statistics(firefly: FireflyClient = Depends(firefly_dep)):
-    raw_txs = firefly.fetch_transactions()
-    single = filter_single_part(raw_txs)
-    uncategorized = filter_without_category(single)
-    filtered_by_desc_exact = filter_by_description(
-        uncategorized, settings.BLIK_DESCRIPTION_FILTER, True
+    processor = TransactionProcessor(firefly)
+    result = await processor.get_stats(
+        description_filter=settings.BLIK_DESCRIPTION_FILTER,
+        tag_done=settings.TAG_BLIK_DONE,
     )
-    filtered_by_desc_partial = filter_by_description(
-        uncategorized, settings.BLIK_DESCRIPTION_FILTER, False
-    )
-
-    simplified = simplify_transactions(filtered_by_desc_exact)
-
-    not_processed = [
-        tx for tx in simplified if not tx.tags or settings.TAG_BLIK_DONE not in tx.tags
-    ]
-
-    return StatisticsResponse(
-        total_transactions=len(raw_txs),
-        single_part_transactions=len(single),
-        uncategorized_transactions=len(uncategorized),
-        filtered_by_description_exact=len(filtered_by_desc_exact),
-        filtered_by_description_partial=len(filtered_by_desc_partial),
-        not_processed_transactions=len(not_processed),
-    )
+    return result
 
 
 @router.post(

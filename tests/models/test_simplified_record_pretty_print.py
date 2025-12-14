@@ -1,5 +1,6 @@
 import pytest
-from services.tx_processor import SimplifiedRecord
+
+from api.models.blik_files import SimplifiedRecord
 
 
 @pytest.fixture
@@ -12,7 +13,7 @@ def record():
         sender_account="",
         recipient_account="PL123",
         date=None,  # type: ignore
-        amount=123.45
+        amount=123.45,
     )
 
 
@@ -20,7 +21,7 @@ def test_pretty_print_default_includes_all_fields(record):
     output = record.pretty_print()
 
     assert "details: Payment for invoice" in output
-    assert "sender: " in output          # puste też są
+    assert "sender: " in output  # puste też są
     assert "operation_amount: 123.45" in output
 
 
@@ -36,20 +37,13 @@ def test_pretty_print_only_meaningful(record):
 
 
 def test_pretty_print_include_whitelist(record):
-    output = record.pretty_print(
-        include={"details", "operation_amount"}
-    )
+    output = record.pretty_print(include={"details", "operation_amount"})
 
-    assert output == (
-        "details: Payment for invoice\n"
-        "operation_amount: 123.45"
-    )
+    assert output == ("details: Payment for invoice\n" "operation_amount: 123.45")
 
 
 def test_pretty_print_exclude_blacklist(record):
-    output = record.pretty_print(
-        exclude={"sender", "sender_account"}
-    )
+    output = record.pretty_print(exclude={"sender", "sender_account"})
 
     assert "sender:" not in output
     assert "sender_account:" not in output
@@ -57,10 +51,7 @@ def test_pretty_print_exclude_blacklist(record):
 
 
 def test_include_has_priority_over_only_meaningful(record):
-    output = record.pretty_print(
-        include={"sender"},
-        only_meaningful=True
-    )
+    output = record.pretty_print(include={"sender"}, only_meaningful=True)
 
     # include mówi „drukuj”, nawet jeśli puste
     assert output == "sender: "
