@@ -88,9 +88,9 @@ class TransactionProcessor:
         return txs
 
     def apply_match(self, tx: SimplifiedTx, record: SimplifiedRecord):
-        new_description = f"{tx.description};{record.details}"
-        # TODO: uniknąć duplikatów w opisie
-        self.firefly_client.update_transaction_description(int(tx.id), new_description)
+        if record.details.lower() not in (tx.description).lower():
+            new_description = f"{tx.description};{record.details}"
+            self.firefly_client.update_transaction_description(int(tx.id), new_description)
         notes = add_line(tx.notes, record.pretty_print(only_meaningful=True))
         self.firefly_client.update_transaction_notes(int(tx.id), notes)
         self.firefly_client.add_tag_to_transaction(int(tx.id), "blik_done")
