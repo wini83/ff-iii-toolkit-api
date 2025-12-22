@@ -7,6 +7,10 @@ from typing import Dict, List
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fireflyiii_enricher_core.firefly_client import FireflyClient
 
+from typing import Optional
+
+import asyncio
+
 from api.models.blik_files import (
     ApplyPayload,
     FileApplyResponse,
@@ -26,6 +30,10 @@ logger = logging.getLogger(__name__)
 
 MEM_MATCHES: Dict[str, List[MatchResult]] = {}
 
+_stats_cache: Optional[StatisticsResponse] = None
+
+_stats_lock = asyncio.Lock()
+
 
 def firefly_dep() -> FireflyClient:
     if not settings.FIREFLY_URL or not settings.FIREFLY_TOKEN:
@@ -43,20 +51,39 @@ def group_by_month(txs: list[SimplifiedTx], tag: str):
 
     return dict(grouped)
 
+async def load_statistics(
+    firefly: FireflyClient,
+    *,
+    refresh: bool = False,
+) -> StatisticsResponse:
+    global _stats_cache
+
+    async with _stats_lock:
+        if _stats_cache is None or refresh:
+            processor = TransactionProcessor(firefly)
+            _stats_cache = await processor.get_stats(
+                description_filter=settings.BLIK_DESCRIPTION_FILTER,
+                tag_done=settings.TAG_BLIK_DONE,
+            )
+
+    return _stats_cache
+
 
 @router.get(
     "/statistics",
     dependencies=[Depends(get_current_user)],
     response_model=StatisticsResponse,
 )
-async def get_statistics(firefly: FireflyClient = Depends(firefly_dep)):
-    processor = TransactionProcessor(firefly)
-    result = await processor.get_stats(
-        description_filter=settings.BLIK_DESCRIPTION_FILTER,
-        tag_done=settings.TAG_BLIK_DONE,
-    )
-    return result
+async def get_stats(
+    firefly: FireflyClient = Depends(firefly_dep),
+):
+    return await load_statistics(firefly)
 
+@router.post("/statistics/refresh", response_model=StatisticsResponse)
+async def refresh_stats(
+    firefly: FireflyClient = Depends(firefly_dep),
+):
+    return await load_statistics(firefly, refresh=True)
 
 @router.post(
     "", dependencies=[Depends(get_current_user)], response_model=UploadResponse
