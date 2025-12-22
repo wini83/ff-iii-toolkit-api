@@ -119,6 +119,12 @@ class TransactionProcessor:
             if not tx.tags or settings.TAG_BLIK_DONE not in tx.tags
         ]
 
+        incomplete_procesed = [
+            tx
+            for tx in incomplete_procesed
+            if not tx.tags or settings.TAG_BLIK_DONE not in tx.tags
+        ]
+
         not_processed_by_month = await group_not_processed_by_month(not_processed)
         incomplete_procesed_by_month = await group_not_processed_by_month(
             incomplete_procesed
@@ -128,8 +134,8 @@ class TransactionProcessor:
             total_transactions=len(raw_txs),
             single_part_transactions=len(single),
             uncategorized_transactions=len(uncategorized),
-            filtered_by_description_exact=len(filtered_by_desc_exact),
-            filtered_by_description_partial=len(filtered_by_desc_partial),
+            filtered_by_description_exact=len(not_processed),
+            filtered_by_description_partial=len(incomplete_procesed),
             not_processed_transactions=len(not_processed),
             not_processed_by_month=not_processed_by_month,
             inclomplete_procesed_by_month=incomplete_procesed_by_month,
