@@ -1,15 +1,12 @@
+import asyncio
 import logging
 import os
 import tempfile
 from collections import defaultdict
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fireflyiii_enricher_core.firefly_client import FireflyClient
-
-from typing import Optional
-
-import asyncio
 
 from api.models.blik_files import (
     ApplyPayload,
@@ -51,6 +48,7 @@ def group_by_month(txs: list[SimplifiedTx], tag: str):
 
     return dict(grouped)
 
+
 async def load_statistics(
     firefly: FireflyClient,
     *,
@@ -79,11 +77,13 @@ async def get_stats(
 ):
     return await load_statistics(firefly)
 
+
 @router.post("/statistics/refresh", response_model=StatisticsResponse)
 async def refresh_stats(
     firefly: FireflyClient = Depends(firefly_dep),
 ):
     return await load_statistics(firefly, refresh=True)
+
 
 @router.post(
     "", dependencies=[Depends(get_current_user)], response_model=UploadResponse

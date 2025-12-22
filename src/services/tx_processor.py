@@ -90,7 +90,9 @@ class TransactionProcessor:
     def apply_match(self, tx: SimplifiedTx, record: SimplifiedRecord):
         if record.details.lower() not in (tx.description).lower():
             new_description = f"{tx.description};{record.details}"
-            self.firefly_client.update_transaction_description(int(tx.id), new_description)
+            self.firefly_client.update_transaction_description(
+                int(tx.id), new_description
+            )
         notes = add_line(tx.notes, record.pretty_print(only_meaningful=True))
         self.firefly_client.update_transaction_notes(int(tx.id), notes)
         self.firefly_client.add_tag_to_transaction(int(tx.id), "blik_done")

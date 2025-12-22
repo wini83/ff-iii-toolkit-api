@@ -39,7 +39,7 @@ def test_pretty_print_only_meaningful(record):
 def test_pretty_print_include_whitelist(record):
     output = record.pretty_print(include={"details", "operation_amount"})
 
-    assert output == ("details: Payment for invoice\n" "operation_amount: 123.45")
+    assert output == ("details: Payment for invoice\noperation_amount: 123.45")
 
 
 def test_pretty_print_exclude_blacklist(record):
