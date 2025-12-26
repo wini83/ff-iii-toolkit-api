@@ -6,6 +6,7 @@ from api.routers.auth import router as auth_router
 from api.routers.blik_files import router as blik_router
 from api.routers.system import init_system_router
 from api.routers.system import router as system_router
+from api.routers.tx import router as tx_router
 from middleware import register_middlewares
 from settings import settings
 from utils.logger import setup_logging
@@ -34,3 +35,4 @@ print(f"Middlewares registered; allowed_origins={settings.allowed_origins}")
 app.include_router(auth_router)
 app.include_router(blik_router)
 app.include_router(system_router)
+app.include_router(tx_router)

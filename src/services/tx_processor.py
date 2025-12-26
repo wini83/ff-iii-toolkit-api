@@ -1,9 +1,10 @@
-from typing import List, cast
+from typing import cast
 
 import pandas as pd
 from anyio import to_thread
 from fireflyiii_enricher_core.firefly_client import (
     FireflyClient,
+    SimplifiedCategory,
     SimplifiedItem,
     SimplifiedTx,
     filter_by_description,
@@ -34,7 +35,7 @@ def txs_to_df(txs: list[SimplifiedTx]) -> pd.DataFrame:
     )
 
 
-def _group_not_processed_sync(txs: List[SimplifiedTx]) -> dict[str, int]:
+def _group_not_processed_sync(txs: list[SimplifiedTx]) -> dict[str, int]:
     if not txs:
         return {}
     df = txs_to_df(txs)
@@ -47,9 +48,13 @@ def _group_not_processed_sync(txs: List[SimplifiedTx]) -> dict[str, int]:
 
 
 async def group_not_processed_by_month(
-    txs: List[SimplifiedTx],
+    txs: list[SimplifiedTx],
 ) -> dict[str, int]:
     return await to_thread.run_sync(_group_not_processed_sync, txs)
+
+
+class CategoryApplyError(RuntimeError):
+    """Failed to assign category to transaction."""
 
 
 class TransactionProcessor:
@@ -60,7 +65,7 @@ class TransactionProcessor:
 
     def match(
         self,
-        bank_records: List[SimplifiedRecord],
+        bank_records: list[SimplifiedRecord],
         filter_text: str,
         exact_match: bool = True,
         tag: str = "blik_done",
@@ -76,14 +81,14 @@ class TransactionProcessor:
         filtered = filter_without_tag(filtered, tag)
         firefly_transactions = simplify_transactions(filtered)
 
-        txs: List[MatchResult] = []
+        txs: list[MatchResult] = []
 
         for tx in firefly_transactions:
             matches = TransactionMatcher.match(
-                tx, cast(List[SimplifiedItem], bank_records)
+                tx, cast(list[SimplifiedItem], bank_records)
             )
             txs.append(
-                MatchResult(tx=tx, matches=cast(List[SimplifiedRecord], matches))
+                MatchResult(tx=tx, matches=cast(list[SimplifiedRecord], matches))
             )
         return txs
 
@@ -140,3 +145,32 @@ class TransactionProcessor:
             not_processed_by_month=not_processed_by_month,
             inclomplete_procesed_by_month=incomplete_procesed_by_month,
         )
+
+    async def get_txs_for_screening(self) -> list[SimplifiedTx]:
+        txs = self.firefly_client.fetch_transactions()
+        non_categorized = filter_without_category(filter_single_part(txs))
+        txs_simplified = simplify_transactions(non_categorized)
+        txs_simplified = [
+            t
+            for t in txs_simplified
+            if (t.description != "BLIK - płatność w internecie")
+        ]
+        txs_simplified = [
+            t
+            for t in txs_simplified
+            if not ("allegro" in t.description.lower() and "allegro_done" not in t.tags)
+        ]
+        return txs_simplified
+
+    async def get_categories(self) -> list[SimplifiedCategory]:
+        """Retrieve categories from Firefly III."""
+        cats = self.firefly_client.fetch_categories(simplified=True)
+        return cast(list[SimplifiedCategory], cats)
+
+    async def apply_category(self, tx_id: int, category_id: int) -> None:
+        try:
+            await self.firefly_client.assign_transaction_category(tx_id, category_id)
+        except RuntimeError as e:
+            raise CategoryApplyError(
+                f"Failed to assign category {category_id} to tx {tx_id}"
+            ) from e

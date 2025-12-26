@@ -1,6 +1,5 @@
 import csv
 from datetime import date, datetime
-from typing import List
 
 from api.models.blik_files import SimplifiedRecord
 
@@ -32,7 +31,7 @@ class BankCSVReader:
 
     def parse(self):
         """Czyta dane z CSV i zwraca listę słowników"""
-        records: List[SimplifiedRecord] = []
+        records: list[SimplifiedRecord] = []
         with open(self.filename, newline="", encoding="utf-8") as csvfile:
             next(csvfile)
             reader = csv.DictReader(csvfile, delimiter=";")

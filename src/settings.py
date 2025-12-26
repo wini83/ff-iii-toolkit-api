@@ -42,8 +42,8 @@ class Settings(BaseSettings):
         if isinstance(v, str) and v.strip().startswith("["):
             try:
                 return json.loads(v)
-            except Exception:
-                raise ValueError("ALLOWED_ORIGINS must be valid JSON list")
+            except Exception as e:
+                raise ValueError("ALLOWED_ORIGINS must be valid JSON list") from e
 
         # jeśli to single string → zrób listę
         if isinstance(v, str):

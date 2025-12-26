@@ -1,6 +1,5 @@
 # app/api/auth.py
 from datetime import datetime, timedelta
-from typing import Optional
 
 import jwt  # pip install PyJWT
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -30,7 +29,7 @@ class Token(BaseModel):
     token_type: str
 
 
-def create_access_token(subject: str, expires_delta: Optional[timedelta] = None):
+def create_access_token(subject: str, expires_delta: timedelta | None = None):
     to_encode: dict[str, object] = {"sub": subject}
     expire = datetime.utcnow() + (
         expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)

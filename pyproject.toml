@@ -27,6 +27,7 @@ name = "cz_conventional_commits"
 tag_format = "v$version"
 version_scheme = "pep440"
 version_provider = "uv"
+annotated_tag = true
 update_changelog_on_bump = true
 [dependency-groups]
 dev = [
@@ -48,3 +49,33 @@ DEP002 = ["python-multipart","uvicorn"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = "-ra"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+fix = true
+
+[tool.ruff.lint]
+select = [
+  "E",   # pycodestyle errors
+  "F",   # pyflakes
+  "W",   # warnings
+  "I",   # importy (zamiast isort)
+  "B",   # flake8-bugbear
+  "UP",  # pyupgrade
+  "C4",  # flake8-comprehensions
+  "SIM", # flake8-simplify
+]
+
+ignore = [
+  "E501", # line-length → ruff-format ogarnia
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.ruff.lint.per-file-ignores]
+"src/api/**/*.py" = ["B008"]
+"src/services/auth.py" = ["B008"]

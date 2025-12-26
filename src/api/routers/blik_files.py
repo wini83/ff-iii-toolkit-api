@@ -3,7 +3,6 @@ import logging
 import os
 import tempfile
 from collections import defaultdict
-from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fireflyiii_enricher_core.firefly_client import FireflyClient
@@ -25,9 +24,9 @@ from utils.encoding import decode_base64url, encode_base64url
 router = APIRouter(prefix="/api/blik_files", tags=["blik-files"])
 logger = logging.getLogger(__name__)
 
-MEM_MATCHES: Dict[str, List[MatchResult]] = {}
+MEM_MATCHES: dict[str, list[MatchResult]] = {}
 
-_stats_cache: Optional[StatisticsResponse] = None
+_stats_cache: StatisticsResponse | None = None
 
 _stats_lock = asyncio.Lock()
 
@@ -154,7 +153,7 @@ async def get_tempfile(encoded_id: str):
         )
 
     except Exception:
-        raise HTTPException(status_code=500, detail="Invalid or corrupted id")
+        raise HTTPException(status_code=500, detail="Invalid or corrupted id") from None
 
 
 @router.get(
@@ -238,7 +237,7 @@ async def apply_matches(encoded_id: str, payload: ApplyPayload):
 
     index = {int(item.tx.id): item for item in data}
 
-    to_update: List[MatchResult] = []
+    to_update: list[MatchResult] = []
 
     for req_id in payload.tx_indexes:
         item = index.get(req_id)

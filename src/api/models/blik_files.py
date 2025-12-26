@@ -1,5 +1,5 @@
+from collections.abc import Iterable
 from dataclasses import dataclass, fields
-from typing import Iterable, List
 
 from fireflyiii_enricher_core.firefly_client import SimplifiedItem, SimplifiedTx
 from pydantic import BaseModel
@@ -43,9 +43,7 @@ class SimplifiedRecord(SimplifiedItem):
             if include is not None:
                 if name not in include:
                     continue
-            elif name in exclude:
-                continue
-            elif only_meaningful and not is_meaningful(value):
+            elif name in exclude or only_meaningful and not is_meaningful(value):
                 continue
 
             lines.append(f"{name}: {value}")
@@ -56,7 +54,7 @@ class SimplifiedRecord(SimplifiedItem):
 @dataclass
 class MatchResult:
     tx: SimplifiedTx
-    matches: List[SimplifiedRecord]
+    matches: list[SimplifiedRecord]
 
 
 class StatisticsResponse(BaseModel):
@@ -84,7 +82,7 @@ class FilePreviewResponse(BaseModel):
     file_id: str
     decoded_name: str
     size: int
-    content: List[SimplifiedRecord]
+    content: list[SimplifiedRecord]
 
 
 class FileMatchResponse(BaseModel):
@@ -95,10 +93,10 @@ class FileMatchResponse(BaseModel):
     transactions_not_matched: int
     transactions_with_one_match: int
     transactions_with_many_matches: int
-    content: List[MatchResult]
+    content: list[MatchResult]
 
 
 class FileApplyResponse(BaseModel):
     file_id: str
     updated: int
-    errors: List[str]
+    errors: list[str]
