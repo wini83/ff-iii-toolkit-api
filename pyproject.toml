@@ -29,6 +29,8 @@ version_scheme = "pep440"
 version_provider = "uv"
 annotated_tag = true
 update_changelog_on_bump = true
+ignore_missing_version = true
+
 [dependency-groups]
 dev = [
     "black>=25.11.0",
