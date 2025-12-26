@@ -128,6 +128,12 @@
 - **api**: - extract upload and file endpoints into separate routers - move csv parsing and transaction processing to services/ - add centralized logging and encoding utilities - introduce config module for env settings - create clean app entrypoint with router registration - improve project structure for scalability and maintainability
 - **all**: black isort ruff
 
+## v2.2.0 (2025-12-26)
+
+### Feat
+
+- add tx router and code refactor with ruff (tier 1 & tier 2)
+
 ## v2.1.3 (2025-12-22)
 
 ### Fix
