@@ -51,17 +51,17 @@ async def get_tx(
     print(diag)
     tx_result: SimplifiedTx | None = None
 
-    if (after_id is None) and txs:
+    if after_id is None:
         tx_result = txs[0]
-
-    for idx, tx in enumerate(txs):
-        print(f"idx:{idx}; id:{tx.id}")
-        if tx.id == str(after_id):
-            tx_result = txs[idx + 1] if idx + 1 < len(txs) else None
-            break
-    if not tx_result:
-        # after_id nie znaleziony → fallback
-        tx_result = txs[0]
+    else:
+        for idx, tx in enumerate(txs):
+            print(f"idx:{idx}; id:{tx.id}")
+            if tx.id == str(after_id):
+                tx_result = txs[idx + 1] if idx + 1 < len(txs) else None
+                break
+        if not tx_result:
+            # after_id nie znaleziony → fallback
+            tx_result = txs[0]
     return ScreeningResponse(tx=tx_result, categories=cats)
 
 

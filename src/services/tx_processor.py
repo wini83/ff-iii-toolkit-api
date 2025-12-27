@@ -169,7 +169,7 @@ class TransactionProcessor:
 
     async def apply_category(self, tx_id: int, category_id: int) -> None:
         try:
-            await self.firefly_client.assign_transaction_category(tx_id, category_id)
+            self.firefly_client.assign_transaction_category(tx_id, category_id)
         except RuntimeError as e:
             raise CategoryApplyError(
                 f"Failed to assign category {category_id} to tx {tx_id}"
