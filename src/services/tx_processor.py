@@ -1,3 +1,4 @@
+from datetime import date
 from typing import cast
 
 import pandas as pd
@@ -146,8 +147,12 @@ class TransactionProcessor:
             inclomplete_procesed_by_month=incomplete_procesed_by_month,
         )
 
-    async def get_txs_for_screening(self) -> list[SimplifiedTx]:
-        txs = self.firefly_client.fetch_transactions()
+    async def get_txs_for_screening(
+        self, start_date: date | None = None, end_date: date | None = None
+    ) -> list[SimplifiedTx]:
+        txs = self.firefly_client.fetch_transactions(
+            start_date=start_date, end_date=end_date
+        )
         non_categorized = filter_without_category(filter_single_part(txs))
         txs_simplified = simplify_transactions(non_categorized)
         txs_simplified = [

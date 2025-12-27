@@ -1,68 +1,57 @@
-from typing import Literal
+import calendar
+from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fireflyiii_enricher_core.firefly_client import FireflyClient
 
-from api.models.tx import ScreeningResponse
+from api.models.tx import ScreeningMonthResponse
 from api.routers.blik_files import firefly_dep
 from services.auth import get_current_user
 from services.tx_processor import (
     CategoryApplyError,
-    SimplifiedCategory,
-    SimplifiedTx,
     TransactionProcessor,
 )
 
-router = APIRouter(prefix="/api/tx", tags=["transactions"])
 
-_tx_cache: list[SimplifiedTx] | None = None
+def month_range(year: int, month: int) -> tuple[date, date]:
+    first_day = date(year, month, 1)
+    last_day = date(year, month, calendar.monthrange(year, month)[1])
+    return first_day, last_day
+
+
+router = APIRouter(prefix="/api/tx", tags=["transactions"])
 
 
 @router.get(
-    "/next",
+    "/screening",
     dependencies=[Depends(get_current_user)],
-    response_model=ScreeningResponse,
+    response_model=ScreeningMonthResponse,
     responses={
-        200: {"description": "Next transaction for screening"},
-        204: {"description": "No more transactions to screen"},
+        200: {"description": "Uncategorized transactions for given month"},
+        204: {"description": "No uncategorized transactions in this month"},
+        400: {"description": "Invalid year or month"},
         502: {"description": "Firefly error"},
     },
 )
-async def get_tx(
-    order: Literal["asc", "desc"] = "asc",
-    after_id: int | None = None,
+async def get_screening_month(
+    year: int = Query(..., ge=2000, le=2100),
+    month: int = Query(..., ge=1, le=12),
     firefly: FireflyClient = Depends(firefly_dep),
 ):
-    global _tx_cache
-    cats: list[SimplifiedCategory] = []
     try:
         processor = TransactionProcessor(firefly)
+        start_date, end_date = month_range(year=year, month=month)
         cats = await processor.get_categories()
-        if not _tx_cache:
-            _tx_cache = await processor.get_txs_for_screening()
+        txs = await processor.get_txs_for_screening(
+            start_date=start_date, end_date=end_date
+        )
     except RuntimeError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
-    if len(_tx_cache) == 0:
+    if len(txs) == 0:
         raise HTTPException(status_code=204)
-    txs = _tx_cache if order == "asc" else list(reversed(_tx_cache))
-    diag = ""
-    for tx in txs[:10]:
-        diag += f"{tx.id};"
-    print(diag)
-    tx_result: SimplifiedTx | None = None
-
-    if after_id is None:
-        tx_result = txs[0]
-    else:
-        for idx, tx in enumerate(txs):
-            print(f"idx:{idx}; id:{tx.id}")
-            if tx.id == str(after_id):
-                tx_result = txs[idx + 1] if idx + 1 < len(txs) else None
-                break
-        if not tx_result:
-            # after_id nie znaleziony → fallback
-            tx_result = txs[0]
-    return ScreeningResponse(tx=tx_result, categories=cats)
+    return ScreeningMonthResponse(
+        year=year, month=month, remaining=len(txs), transactions=txs, categories=cats
+    )
 
 
 @router.post(
@@ -79,7 +68,5 @@ async def apply_category(
     global _tx_cache
     try:
         await processor.apply_category(tx_id, category_id)
-        if _tx_cache:
-            _tx_cache = [tx for tx in _tx_cache if int(tx.id) != tx_id]
     except CategoryApplyError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
