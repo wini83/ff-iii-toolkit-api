@@ -76,7 +76,10 @@ async def apply_category(
     firefly: FireflyClient = Depends(firefly_dep),
 ):
     processor = TransactionProcessor(firefly)
+    global _tx_cache
     try:
         await processor.apply_category(tx_id, category_id)
+        if _tx_cache:
+            _tx_cache = [tx for tx in _tx_cache if int(tx.id) != tx_id]
     except CategoryApplyError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
