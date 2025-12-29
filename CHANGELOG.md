@@ -128,6 +128,12 @@
 - **api**: - extract upload and file endpoints into separate routers - move csv parsing and transaction processing to services/ - add centralized logging and encoding utilities - introduce config module for env settings - create clean app entrypoint with router registration - improve project structure for scalability and maintainability
 - **all**: black isort ruff
 
+## v2.2.4 (2025-12-29)
+
+### Refactor
+
+- **tx**: added tag eindpoint
+
 ## v2.2.3 (2025-12-27)
 
 ### Refactor
