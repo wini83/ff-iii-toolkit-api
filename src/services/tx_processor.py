@@ -17,6 +17,7 @@ from fireflyiii_enricher_core.firefly_client import (
 from fireflyiii_enricher_core.matcher import TransactionMatcher
 
 from api.models.blik_files import MatchResult, SimplifiedRecord, StatisticsResponse
+from api.models.tx import TxTag
 from settings import settings
 
 
@@ -165,6 +166,7 @@ class TransactionProcessor:
             for t in txs_simplified
             if not ("allegro" in t.description.lower() and "allegro_done" not in t.tags)
         ]
+        txs_simplified = [t for t in txs_simplified if TxTag.action_req not in t.tags]
         return txs_simplified
 
     async def get_categories(self) -> list[SimplifiedCategory]:
@@ -179,3 +181,9 @@ class TransactionProcessor:
             raise CategoryApplyError(
                 f"Failed to assign category {category_id} to tx {tx_id}"
             ) from e
+
+    async def add_tag(self, tx_id: int, tag: str) -> None:
+        try:
+            self.firefly_client.add_tag_to_transaction(tx_id, new_tag=tag)
+        except RuntimeError as e:
+            raise CategoryApplyError(f"Failed to add tag {tag} to tx {tx_id}") from e

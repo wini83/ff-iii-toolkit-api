@@ -4,7 +4,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fireflyiii_enricher_core.firefly_client import FireflyClient
 
-from api.models.tx import ScreeningMonthResponse
+from api.models.tx import ScreeningMonthResponse, TxTag
 from api.routers.blik_files import firefly_dep
 from services.auth import get_current_user
 from services.tx_processor import (
@@ -68,5 +68,23 @@ async def apply_category(
     global _tx_cache
     try:
         await processor.apply_category(tx_id, category_id)
+    except CategoryApplyError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+
+@router.post(
+    "/{tx_id}/tag/",
+    status_code=204,
+    dependencies=[Depends(get_current_user)],
+)
+async def apply_tag(
+    tx_id: int,
+    tag: TxTag = Query(...),
+    firefly: FireflyClient = Depends(firefly_dep),
+):
+    processor = TransactionProcessor(firefly)
+    global _tx_cache
+    try:
+        await processor.add_tag(tx_id=tx_id, tag=tag)
     except CategoryApplyError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
