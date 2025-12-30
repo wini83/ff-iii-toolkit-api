@@ -4,7 +4,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 from pydantic import field_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Load .env immediately
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -55,8 +55,10 @@ class Settings(BaseSettings):
 
         raise ValueError(f"Invalid ALLOWED_ORIGINS format: {v}")
 
-    class Config:
-        env_file = ENV_PATH
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+    )
 
 
 settings = Settings()
