@@ -86,3 +86,13 @@ line-ending = "lf"
 
 [tool.coverage.run]
 source = ["src"]
+branch = true
+omit = [
+  "*/__init__.py",
+  "*/tests/*",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+fail_under = 70

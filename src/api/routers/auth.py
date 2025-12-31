@@ -1,5 +1,5 @@
 # app/api/auth.py
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import jwt  # pip install PyJWT
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -31,7 +31,7 @@ class Token(BaseModel):
 
 def create_access_token(subject: str, expires_delta: timedelta | None = None):
     to_encode: dict[str, object] = {"sub": subject, "typ": "access"}
-    expire = datetime.utcnow() + (
+    expire = datetime.now(UTC) + (
         expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     to_encode["exp"] = expire
@@ -41,7 +41,7 @@ def create_access_token(subject: str, expires_delta: timedelta | None = None):
 
 def create_refresh_token(subject: str, expires_delta: timedelta | None = None):
     to_encode: dict[str, object] = {"sub": subject, "typ": "refresh"}
-    expire = datetime.utcnow() + (
+    expire = datetime.now(UTC) + (
         expires_delta or timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     )
     to_encode["exp"] = expire

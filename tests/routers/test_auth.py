@@ -13,8 +13,6 @@ def test_auth_token_happy_path(client, monkeypatch):
 
 def test_auth_refresh_happy_path(client):
     token = auth_router.create_refresh_token("user")
-    response = client.post(
-        "/api/auth/refresh",
-        cookies={settings.REFRESH_COOKIE_NAME: token},
-    )
+    client.cookies.set(settings.REFRESH_COOKIE_NAME, token)
+    response = client.post("/api/auth/refresh")
     assert response.status_code == 200
