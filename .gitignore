@@ -130,3 +130,7 @@ __pycache__/
 .venv/
 .vscode/
 data-legacy/
+
+.coverage
+coverage.xml
+htmlcov/

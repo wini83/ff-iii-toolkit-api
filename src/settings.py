@@ -4,7 +4,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 from pydantic import field_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Load .env immediately
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     BLIK_DESCRIPTION_FILTER: str = "BLIK - płatność w internecie"
     TAG_BLIK_DONE: str = "blik_done"
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+    REFRESH_COOKIE_NAME: str = "refresh_token"
+    REFRESH_TOKEN_SECURE: bool = False
 
     @field_validator("allowed_origins", mode="before")
     def parse_allowed_origins(cls, v):
@@ -55,8 +58,10 @@ class Settings(BaseSettings):
 
         raise ValueError(f"Invalid ALLOWED_ORIGINS format: {v}")
 
-    class Config:
-        env_file = ENV_PATH
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+    )
 
 
 settings = Settings()
