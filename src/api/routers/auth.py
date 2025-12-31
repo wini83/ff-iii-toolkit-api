@@ -9,8 +9,6 @@ from pydantic import BaseModel
 from settings import settings
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
-REFRESH_TOKEN_EXPIRE_DAYS = 30
-REFRESH_COOKIE_NAME = "refresh_token"
 
 
 def load_users() -> dict:
@@ -44,7 +42,7 @@ def create_access_token(subject: str, expires_delta: timedelta | None = None):
 def create_refresh_token(subject: str, expires_delta: timedelta | None = None):
     to_encode: dict[str, object] = {"sub": subject, "typ": "refresh"}
     expire = datetime.utcnow() + (
-        expires_delta or timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+        expires_delta or timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     )
     to_encode["exp"] = expire
     encoded = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
@@ -86,12 +84,12 @@ async def login_for_access_token(
     access_token = create_access_token(subject=username)
     refresh_token = create_refresh_token(subject=username)
     response.set_cookie(
-        REFRESH_COOKIE_NAME,
+        settings.REFRESH_COOKIE_NAME,
         refresh_token,
         httponly=True,
-        secure=False,
+        secure=settings.REFRESH_TOKEN_SECURE,
         samesite="lax",
-        max_age=int(timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS).total_seconds()),
+        max_age=int(timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS).total_seconds()),
         path="/",
     )
     return {"access_token": access_token, "token_type": "bearer"}
@@ -99,7 +97,7 @@ async def login_for_access_token(
 
 @router.post("/refresh", response_model=Token)
 async def refresh_access_token(request: Request):
-    token = request.cookies.get(REFRESH_COOKIE_NAME)
+    token = request.cookies.get(settings.REFRESH_COOKIE_NAME)
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

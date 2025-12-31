@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     BLIK_DESCRIPTION_FILTER: str = "BLIK - płatność w internecie"
     TAG_BLIK_DONE: str = "blik_done"
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+    REFRESH_COOKIE_NAME: str = "refresh_token"
+    REFRESH_TOKEN_SECURE: bool = False
 
     @field_validator("allowed_origins", mode="before")
     def parse_allowed_origins(cls, v):
