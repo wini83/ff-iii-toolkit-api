@@ -128,6 +128,14 @@
 - **api**: - extract upload and file endpoints into separate routers - move csv parsing and transaction processing to services/ - add centralized logging and encoding utilities - introduce config module for env settings - create clean app entrypoint with router registration - improve project structure for scalability and maintainability
 - **all**: black isort ruff
 
+## v2.2.5 (2025-12-31)
+
+### Refactor
+
+- **auth**: handle refresh token, added tests
+- **auth**: move refresh token settings to config
+- **auth**: add refresh flow; add pytest-cov config
+
 ## v2.2.4 (2025-12-29)
 
 ### Refactor
