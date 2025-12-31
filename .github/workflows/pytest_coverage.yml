@@ -24,13 +24,13 @@ jobs:
       - name: Install dependencies (with dev)
         run: uv sync --frozen --dev
 
-      - name: Install project (editable)
-        run: uv pip install -e .
+      # - name: Install project (editable)
+      #   run: uv pip install -e .
 
       - name: Run tests with coverage
         run: |
           uv run pytest \
-            --cov=stravit_companion \
+            --cov=src \
             --cov-report=term-missing \
             --cov-report=xml \
             --cov-fail-under=70
