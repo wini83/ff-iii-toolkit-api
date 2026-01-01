@@ -1,3 +1,4 @@
+import logging
 import tomllib
 
 from fastapi import FastAPI
@@ -13,6 +14,8 @@ from utils.logger import setup_logging
 
 setup_logging()
 
+logger = logging.getLogger(__name__)
+
 
 def get_version() -> str:
     with open("pyproject.toml", "rb") as f:
@@ -23,13 +26,16 @@ def get_version() -> str:
 
 APP_VERSION = get_version()
 
-print(f"Settings loaded, DEMO_MODE={settings.DEMO_MODE}")
+
+logger.info("Settings loaded ")
+logger.info(f"DEMO_MODE={settings.DEMO_MODE}")
+logger.info(f"Acces token expore: {settings.ACCESS_TOKEN_EXPIRE_MINUTES} minutes")
 
 app = FastAPI(title="Firefly III Toolkit", version=APP_VERSION)
 
 register_middlewares(app, settings)
 
-print(f"Middlewares registered; allowed_origins={settings.allowed_origins}")
+logger.info(f"Allowed_origins={settings.allowed_origins}")
 
 
 app.include_router(auth_router)
