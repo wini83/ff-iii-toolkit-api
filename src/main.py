@@ -29,7 +29,7 @@ APP_VERSION = get_version()
 
 logger.info("Settings loaded ")
 logger.info(f"DEMO_MODE={settings.DEMO_MODE}")
-logger.info(f"Acces token expore: {settings.ACCESS_TOKEN_EXPIRE_MINUTES} minutes")
+logger.info(f"Acces token expire: {settings.ACCESS_TOKEN_EXPIRE_MINUTES} minutes")
 
 app = FastAPI(title="Firefly III Toolkit", version=APP_VERSION)
 
