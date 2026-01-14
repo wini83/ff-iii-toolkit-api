@@ -2,15 +2,15 @@ import calendar
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fireflyiii_enricher_core.firefly_client import FireflyClient
+from ff_iii_luciferin.api import FireflyClient
+from services.firefly_service import (
+    CategoryApplyError,
+    TransactionProcessor,
+)
 
 from api.models.tx import ScreeningMonthResponse, TxTag
 from api.routers.blik_files import firefly_dep
 from services.auth import get_current_user
-from services.tx_processor import (
-    CategoryApplyError,
-    TransactionProcessor,
-)
 
 
 def month_range(year: int, month: int) -> tuple[date, date]:
