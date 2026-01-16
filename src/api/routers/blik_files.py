@@ -1,4 +1,5 @@
 import logging
+from functools import lru_cache
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from ff_iii_luciferin.api import FireflyClient
@@ -33,16 +34,26 @@ logger = logging.getLogger(__name__)
 # --------------------------------------------------
 
 
-def blik_service_dep() -> BlikApplicationService:
+@lru_cache(maxsize=1)
+def blik_service_singleton() -> BlikApplicationService:
     if not settings.FIREFLY_URL or not settings.FIREFLY_TOKEN:
-        logger.error("Missing FIREFLY_URL or FIREFLY_TOKEN")
-        raise HTTPException(status_code=500, detail="Config error")
+        raise RuntimeError("Config error")
 
-    client = FireflyClient(base_url=settings.FIREFLY_URL, token=settings.FIREFLY_TOKEN)
+    client = FireflyClient(
+        base_url=settings.FIREFLY_URL,
+        token=settings.FIREFLY_TOKEN,
+    )
 
-    blik_service = FireflyBlikService(client, settings.BLIK_DESCRIPTION_FILTER)
+    blik_service = FireflyBlikService(
+        client,
+        settings.BLIK_DESCRIPTION_FILTER,
+    )
 
     return BlikApplicationService(blik_service=blik_service)
+
+
+def blik_service_dep() -> BlikApplicationService:
+    return blik_service_singleton()
 
 
 # --------------------------------------------------
