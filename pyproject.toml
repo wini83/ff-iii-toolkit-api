@@ -17,6 +17,7 @@ dependencies = [
  "pandas-stubs>=2.3.3.251201",
  "httpx>=0.28.1",
  "ff-iii-luciferin>=1.0.0b2",
+ "requests>=2.32.5",
 ]
 
 
