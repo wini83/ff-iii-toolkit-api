@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import re
 import tempfile
 from typing import cast
 
@@ -35,6 +36,8 @@ from settings import settings
 from utils.encoding import decode_base64url, encode_base64url
 
 logger = logging.getLogger(__name__)
+
+SAFE_NAME_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
 
 
 class BlikApplicationService:
@@ -202,7 +205,17 @@ class BlikApplicationService:
 
     @staticmethod
     def _resolve_csv_path(decoded: str) -> str:
-        path = os.path.join(tempfile.gettempdir(), decoded + ".csv")
-        if not os.path.exists(path):
+        if not SAFE_NAME_RE.match(decoded):
+            raise FileNotFound("Invalid file identifier")
+
+        base_dir = tempfile.gettempdir()
+        filename = f"{decoded}.csv"
+        full_path = os.path.normpath(os.path.join(base_dir, filename))
+
+        if not full_path.startswith(os.path.abspath(base_dir)):
+            raise FileNotFound("Invalid file path")
+
+        if not os.path.exists(full_path):
             raise FileNotFound("File not found")
-        return path
+
+        return full_path
