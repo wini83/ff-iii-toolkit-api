@@ -49,7 +49,7 @@ class FireflyBlikService(FireflyEnrichmentService):
         self.filter_desc_blik = filter_desc_blik
 
     async def fetch_blik_metrics(self) -> BlikStatisticsMetrics:
-        domain_txs, metrics = await self.fetch_transaction_with_metrics()
+        domain_txs, metrics = await self.fetch_transactions_with_metrics()
         uncategorized = filter_out_categorized(domain_txs)
         filtered_by_desc_exact = filter_by_description(
             uncategorized, self.filter_desc_blik, exact_match=True

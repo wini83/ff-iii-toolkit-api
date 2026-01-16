@@ -13,9 +13,7 @@ from services.firefly_base_service import (
     FireflyServiceError,
     filter_by_description,
 )
-from services.mappers.firefly import (
-    category_from_ff_category,
-)
+from services.mappers.firefly import category_from_ff_category, tx_from_ff_tx
 
 
 class FireflyTxService(FireflyBaseService):
@@ -32,7 +30,7 @@ class FireflyTxService(FireflyBaseService):
     async def get_txs_for_screening(
         self, start_date: date | None = None, end_date: date | None = None
     ) -> list[Transaction]:
-        domain_txs = await self.fetch_transaction(
+        domain_txs = await self.fetch_transactions(
             start_date=start_date, end_date=end_date, exclude_categorized=True
         )
         filtered = filter_by_description(
@@ -60,6 +58,17 @@ class FireflyTxService(FireflyBaseService):
             ) from e
         return [category_from_ff_category(cat) for cat in ff_cats]
 
+    async def get_transaction(self, tx_id: int) -> Transaction:
+        """Retrieve a single transaction from Firefly III."""
+        try:
+            ff_tx = await self.firefly_client.get_transaction(tx_id)
+        except FireflyAPIError as e:
+            raise FireflyServiceError(
+                message=f"Failed to fetch transaction {tx_id}",
+                status_code=e.status_code,
+            ) from e
+        return tx_from_ff_tx(ff_tx)
+
     async def apply_category(self, tx: Transaction, category_id: int) -> None:
         payload = TransactionUpdate(category_id=category_id)
         await self.update_transaction(tx, payload=payload)
@@ -68,3 +77,11 @@ class FireflyTxService(FireflyBaseService):
         tx.tags.add(tag)
         paytoad = TransactionUpdate(tags=list(tx.tags))
         await self.update_transaction(tx, paytoad)
+
+    async def apply_category_by_id(self, tx_id: int, category_id: int) -> None:
+        tx = await self.get_transaction(tx_id)
+        await self.apply_category(tx=tx, category_id=category_id)
+
+    async def add_tag_by_id(self, tx_id: int, tag: str) -> None:
+        tx = await self.get_transaction(tx_id)
+        await self.add_tag(tx=tx, tag=tag)

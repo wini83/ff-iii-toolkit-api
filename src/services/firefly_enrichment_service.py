@@ -22,7 +22,7 @@ class FireflyEnrichmentService(FireflyBaseService):
     ):
         min_date = min(r.date for r in candidates)
         max_date = max(r.date for r in candidates)
-        domain_txs = await self.fetch_transaction(
+        domain_txs = await self.fetch_transactions(
             start_date=min_date, end_date=max_date, exclude_categorized=True
         )
         filtered = filter_by_description(domain_txs, filter_text, exact_match=False)

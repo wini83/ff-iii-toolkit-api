@@ -11,7 +11,7 @@ from services.firefly_blik_service import FireflyBlikService
 
 def test_preview_matches_blik_transactions():
     service = FireflyBlikService(MagicMock(), filter_desc_blik="blik")
-    service.fetch_transaction = AsyncMock()
+    service.fetch_transactions = AsyncMock()
     service.update_transaction = AsyncMock()
 
     tx_match = Transaction(
@@ -32,7 +32,7 @@ def test_preview_matches_blik_transactions():
         notes=None,
         category=None,
     )
-    service.fetch_transaction.return_value = [tx_match, tx_tagged]
+    service.fetch_transactions.return_value = [tx_match, tx_tagged]
 
     record = BankRecord(
         date=date(2024, 1, 5),
@@ -56,7 +56,7 @@ def test_preview_matches_blik_transactions():
 
 def test_get_blik_metrics_aggregates_counts_and_months():
     service = FireflyBlikService(MagicMock(), filter_desc_blik="blik")
-    service.fetch_transaction_with_metrics = AsyncMock()
+    service.fetch_transactions_with_metrics = AsyncMock()
 
     txs = [
         Transaction(
@@ -111,9 +111,9 @@ def test_get_blik_metrics_aggregates_counts_and_months():
         invalid=0,
         multipart=0,
     )
-    service.fetch_transaction_with_metrics.return_value = (txs, metrics)
+    service.fetch_transactions_with_metrics.return_value = (txs, metrics)
 
-    stats = asyncio.run(service.get_blik_metrics())
+    stats = asyncio.run(service.fetch_blik_metrics())
 
     assert stats.total_transactions == 50
     assert stats.single_part_transactions == 5

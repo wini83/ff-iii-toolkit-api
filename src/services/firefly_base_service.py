@@ -57,7 +57,7 @@ class FireflyBaseService:
     ):
         self.firefly_client = firefly_client
 
-    async def fetch_transaction(
+    async def fetch_transactions(
         self,
         start_date: date | None = None,
         end_date: date | None = None,
@@ -95,7 +95,7 @@ class FireflyBaseService:
                 status_code=e.status_code,
             ) from e
 
-    async def fetch_transaction_with_metrics(
+    async def fetch_transactions_with_metrics(
         self, start_date: date | None = None, end_date: date | None = None
     ) -> tuple[list[Transaction], FetchMetrics]:
         try:

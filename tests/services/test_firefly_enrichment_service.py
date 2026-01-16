@@ -10,7 +10,7 @@ from services.firefly_enrichment_service import FireflyEnrichmentService
 
 def test_match_filters_and_does_not_update_transactions():
     service = FireflyEnrichmentService(MagicMock())
-    service.fetch_transaction = AsyncMock()
+    service.fetch_transactions = AsyncMock()
     service.update_transaction = AsyncMock()
 
     tx_match = Transaction(
@@ -40,7 +40,7 @@ def test_match_filters_and_does_not_update_transactions():
         notes=None,
         category=None,
     )
-    service.fetch_transaction.return_value = [tx_match, tx_tagged, tx_other]
+    service.fetch_transactions.return_value = [tx_match, tx_tagged, tx_other]
 
     record = BankRecord(
         date=date(2024, 1, 5),
@@ -54,7 +54,7 @@ def test_match_filters_and_does_not_update_transactions():
         service.match([record], filter_text="blik", tag_done=TxTag.blik_done)
     )
 
-    service.fetch_transaction.assert_awaited_once_with(
+    service.fetch_transactions.assert_awaited_once_with(
         start_date=date(2024, 1, 5),
         end_date=date(2024, 1, 5),
         exclude_categorized=True,
