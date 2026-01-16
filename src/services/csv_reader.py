@@ -1,7 +1,8 @@
 import csv
 from datetime import date, datetime
+from decimal import Decimal, InvalidOperation
 
-from api.models.blik_files import SimplifiedRecord
+from services.domain.bank_record import BankRecord
 
 
 def parse_pl_date(s: str) -> date:
@@ -13,14 +14,25 @@ def parse_pl_date(s: str) -> date:
     return datetime.strptime(s, "%d-%m-%Y").date()
 
 
-def parse_amount(s: str) -> float:
+def parse_amount(s: str) -> Decimal:
     """
-    Parsuje kwotę w formacie polskim, zamieniając przecinki na kropki i usuwając spacje.
-    Zwraca wartość typu float.
-    Rzuca ValueError przy złym formacie.
+    Parse a monetary amount from a string.
+
+    The function:
+    - strips whitespace,
+    - removes thousands separators (spaces),
+    - replaces comma with dot as the decimal separator.
+
+    Returns a Decimal for precise financial calculations.
+
+    Raises:
+        ValueError: if the input string cannot be parsed into a valid amount.
     """
     s = s.strip().replace(" ", "").replace(",", ".")
-    return float(s)
+    try:
+        return Decimal(s)
+    except InvalidOperation as exc:
+        raise ValueError(f"Invalid amount format: {s}") from exc
 
 
 class BankCSVReader:
@@ -31,13 +43,13 @@ class BankCSVReader:
 
     def parse(self):
         """Czyta dane z CSV i zwraca listę słowników"""
-        records: list[SimplifiedRecord] = []
+        records: list[BankRecord] = []
         with open(self.filename, newline="", encoding="utf-8") as csvfile:
             next(csvfile)
             reader = csv.DictReader(csvfile, delimiter=";")
             for row in reader:
                 records.append(
-                    SimplifiedRecord(
+                    BankRecord(
                         date=parse_pl_date(row["Data transakcji"]),
                         amount=parse_amount(
                             row["Kwota w walucie rachunku"]

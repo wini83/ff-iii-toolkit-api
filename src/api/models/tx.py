@@ -1,17 +1,37 @@
-from dataclasses import dataclass
+from datetime import date
 from enum import Enum
 
-from fireflyiii_enricher_core.firefly_client import SimplifiedCategory, SimplifiedTx
+from pydantic import BaseModel
 
 
-@dataclass
-class ScreeningResponse:
+class SimplifiedItem(BaseModel):
+    date: date
+    amount: float
+
+
+class SimplifiedTx(SimplifiedItem):
+    """Simplified representation of a Firefly III transaction."""
+
+    id: int
+    description: str
+    tags: list[str]
+    notes: str
+    category: str
+
+
+class SimplifiedCategory(BaseModel):
+    """Simplified representation of a Firefly III Category."""
+
+    id: int
+    name: str
+
+
+class ScreeningResponse(BaseModel):
     tx: SimplifiedTx
     categories: list[SimplifiedCategory]
 
 
-@dataclass
-class ScreeningMonthResponse:
+class ScreeningMonthResponse(BaseModel):
     year: int
     month: int
     remaining: int
