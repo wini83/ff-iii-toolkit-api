@@ -20,7 +20,7 @@ dependencies = [
  "requests>=2.32.5",
  "sqlalchemy>=2.0.45",
  "passlib[bcrypt]>=1.7.4",
- "bcrypt<4.1",
+ "argon2-cffi>=25.1.0",
 ]
 
 
@@ -56,6 +56,9 @@ DEP002 = ["python-multipart","uvicorn"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = "-ra"
+filterwarnings = [
+  "ignore:Support for class-based `config` is deprecated.*:pydantic.warnings.PydanticDeprecatedSince20",
+]
 
 [tool.ruff]
 target-version = "py312"

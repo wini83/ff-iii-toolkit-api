@@ -1,6 +1,11 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
 
-from api.models.system import HealthResponse, VersionResponse
+from api.deps_db import get_db
+from api.models.system import BootstrapPayload, HealthResponse, VersionResponse
+from services.db.passwords import hash_password
+from services.db.repository import UserRepository
+from services.system.bootstrap import BootstrapAlreadyDone, BootstrapService
 
 router = APIRouter(prefix="/api/system", tags=["system"])
 
@@ -21,3 +26,21 @@ async def health_check():
 @router.get("/version", response_model=VersionResponse)
 async def version_check():
     return VersionResponse(version=APP_VERSION or "unknown")
+
+
+@router.post("/bootstrap", status_code=201)
+def bootstrap_system(
+    payload: BootstrapPayload,
+    db: Session = Depends(get_db),
+):
+    service = BootstrapService(UserRepository(db))
+    try:
+        service.bootstrap_superuser(
+            username=payload.username,
+            password_hash=hash_password(payload.password),
+        )
+    except BootstrapAlreadyDone as e:
+        raise HTTPException(
+            status_code=409,
+            detail="System already bootstrapped",
+        ) from e

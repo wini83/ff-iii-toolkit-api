@@ -2,21 +2,22 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from api.deps_db import get_db
-from main import app
 from services.db.models import Base
 
 
 @pytest.fixture(scope="function")
 def db():
     engine = create_engine(
-        "sqlite:///:memory:",
+        "sqlite://",
         connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
     )
     TestingSessionLocal = sessionmaker(bind=engine)
 
-    Base.metadata.create_all(bind=engine)
+    Base.metadata.create_all(engine)
 
     session = TestingSessionLocal()
     try:
@@ -29,6 +30,8 @@ def db():
 def client(db):
     def override_get_db():
         yield db
+
+    from main import app
 
     app.dependency_overrides[get_db] = override_get_db
 

@@ -19,6 +19,9 @@ class UserRepository:
         row = self.db.query(UserORM).filter(UserORM.id == user_id).one_or_none()
         return self._to_domain(row) if row else None
 
+    def count_users(self) -> int:
+        return self.db.query(UserORM).count()
+
     def create(
         self,
         username: str,
