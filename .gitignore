@@ -134,3 +134,4 @@ data-legacy/
 .coverage
 coverage.xml
 htmlcov/
+data/app.db

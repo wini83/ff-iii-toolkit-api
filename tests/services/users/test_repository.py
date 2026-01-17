@@ -1,8 +1,8 @@
 from services.db.repository import UserRepository
 
 
-def test_create_and_get_user(db_session):
-    repo = UserRepository(db_session)
+def test_create_and_get_user(db):
+    repo = UserRepository(db)
 
     repo.create(
         username="alice",
@@ -18,8 +18,8 @@ def test_create_and_get_user(db_session):
     assert fetched.is_active is True
 
 
-def test_disable_user(db_session):
-    repo = UserRepository(db_session)
+def test_disable_user(db):
+    repo = UserRepository(db)
 
     user = repo.create(
         username="bob",
