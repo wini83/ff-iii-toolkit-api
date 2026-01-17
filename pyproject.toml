@@ -18,6 +18,7 @@ dependencies = [
  "httpx>=0.28.1",
  "ff-iii-luciferin>=1.0.0b2",
  "requests>=2.32.5",
+ "sqlalchemy>=2.0.45",
 ]
 
 
