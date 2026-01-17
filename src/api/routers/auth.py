@@ -1,27 +1,18 @@
 # app/api/auth.py
 from datetime import UTC, datetime, timedelta
 
-import jwt  # pip install PyJWT
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+import jwt
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
+from api.deps_db import get_db
+from services.db.passwords import verify_password
+from services.db.repository import UserRepository
 from settings import settings
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
-
-
-def load_users() -> dict:
-    users = {}
-    if settings.USERS:
-        for part in settings.USERS.split(","):
-            if ":" in part:
-                u, p = part.split(":", 1)
-                users[u.strip()] = p.strip()
-    return users
-
-
-USERS = load_users()
 
 
 class Token(BaseModel):
@@ -35,8 +26,7 @@ def create_access_token(subject: str, expires_delta: timedelta | None = None):
         expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     to_encode["exp"] = expire
-    encoded = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
-    return encoded
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
 def create_refresh_token(subject: str, expires_delta: timedelta | None = None):
@@ -45,8 +35,7 @@ def create_refresh_token(subject: str, expires_delta: timedelta | None = None):
         expires_delta or timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     )
     to_encode["exp"] = expire
-    encoded = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
-    return encoded
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
 def decode_token(token: str) -> dict[str, object]:
@@ -57,32 +46,29 @@ def decode_token(token: str) -> dict[str, object]:
             algorithms=[settings.ALGORITHM],
         )
     except jwt.ExpiredSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token expired",
-        ) from None
+        raise HTTPException(status_code=401, detail="Token expired") from None
     except jwt.InvalidTokenError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token",
-        ) from None
+        raise HTTPException(status_code=401, detail="Invalid token") from None
 
 
 @router.post("/token", response_model=Token)
 async def login_for_access_token(
-    response: Response, form_data: OAuth2PasswordRequestForm = Depends()
+    response: Response,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
 ):
-    # OAuth2PasswordRequestForm expects fields: username, password (x-www-form-urlencoded)
-    username = form_data.username
-    password = form_data.password
-    real = USERS.get(username)
-    if not real or real != password:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-        )
-    access_token = create_access_token(subject=username)
-    refresh_token = create_refresh_token(subject=username)
+    repo = UserRepository(db)
+
+    user = repo.get_by_username(form_data.username)
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="Incorrect username or password")
+
+    if not verify_password(form_data.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Incorrect username or password")
+
+    access_token = create_access_token(subject=str(user.id))
+    refresh_token = create_refresh_token(subject=str(user.id))
+
     response.set_cookie(
         settings.REFRESH_COOKIE_NAME,
         refresh_token,
@@ -96,28 +82,20 @@ async def login_for_access_token(
 
 
 @router.post("/refresh", response_model=Token)
-async def refresh_access_token(request: Request):
+async def refresh_access_token(
+    request: Request,
+):
     token = request.cookies.get(settings.REFRESH_COOKIE_NAME)
     if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing refresh token",
-        )
+        raise HTTPException(status_code=401, detail="Missing refresh token")
 
     payload = decode_token(token)
-
     if payload.get("typ") != "refresh":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token",
-        )
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
 
     subject = payload.get("sub")
     if not subject:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token",
-        )
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
 
     access_token = create_access_token(subject=str(subject))
     return {"access_token": access_token, "token_type": "bearer"}
