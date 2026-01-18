@@ -4,13 +4,17 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from ff_iii_luciferin.api import FireflyClient
 
 from api.models.tx import ScreeningMonthResponse, TxTag
-from services.auth import get_current_user
 from services.exceptions import ExternalServiceFailed
 from services.firefly_tx_service import FireflyTxService
+from services.guards import require_active_user
 from services.tx_application_service import TxApplicationService
 from settings import settings
 
-router = APIRouter(prefix="/api/tx", tags=["transactions"])
+router = APIRouter(
+    prefix="/api/tx",
+    tags=["transactions"],
+    dependencies=[Depends(require_active_user)],
+)
 
 
 # --------------------------------------------------
@@ -48,7 +52,6 @@ def tx_service_dep() -> TxApplicationService:
 
 @router.get(
     "/screening",
-    dependencies=[Depends(get_current_user)],
     response_model=ScreeningMonthResponse,
     responses={
         200: {"description": "Uncategorized transactions for given month"},
@@ -74,7 +77,6 @@ async def get_screening_month(
 @router.post(
     "/{tx_id}/category/{category_id}",
     status_code=204,
-    dependencies=[Depends(get_current_user)],
 )
 async def apply_category(
     tx_id: int,
@@ -90,7 +92,6 @@ async def apply_category(
 @router.post(
     "/{tx_id}/tag/",
     status_code=204,
-    dependencies=[Depends(get_current_user)],
 )
 async def apply_tag(
     tx_id: int,

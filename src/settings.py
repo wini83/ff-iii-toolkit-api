@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     REFRESH_COOKIE_NAME: str = "refresh_token"
     REFRESH_TOKEN_SECURE: bool = False
     log_level: str = "INFO"
+    database_url: str = "sqlite:///./data/app.db"
 
     @field_validator("allowed_origins", mode="before")
     def parse_allowed_origins(cls, v):

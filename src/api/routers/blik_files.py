@@ -12,7 +12,6 @@ from api.models.blik_files import (
     StatisticsResponse,
     UploadResponse,
 )
-from services.auth import get_current_user
 from services.blik_application_service import BlikApplicationService
 from services.exceptions import (
     ExternalServiceFailed,
@@ -23,9 +22,14 @@ from services.exceptions import (
     TransactionNotFound,
 )
 from services.firefly_blik_service import FireflyBlikService
+from services.guards import require_active_user
 from settings import settings
 
-router = APIRouter(prefix="/api/blik_files", tags=["blik-files"])
+router = APIRouter(
+    prefix="/api/blik_files",
+    tags=["blik-files"],
+    dependencies=[Depends(require_active_user)],
+)
 logger = logging.getLogger(__name__)
 
 
@@ -63,7 +67,6 @@ def blik_service_dep() -> BlikApplicationService:
 
 @router.get(
     "/statistics",
-    dependencies=[Depends(get_current_user)],
     response_model=StatisticsResponse,
 )
 async def get_statistics(
@@ -77,7 +80,6 @@ async def get_statistics(
 
 @router.post(
     "/statistics/refresh",
-    dependencies=[Depends(get_current_user)],
     response_model=StatisticsResponse,
 )
 async def refresh_statistics(
@@ -91,7 +93,6 @@ async def refresh_statistics(
 
 @router.post(
     "",
-    dependencies=[Depends(get_current_user)],
     response_model=UploadResponse,
 )
 async def upload_csv(
@@ -104,7 +105,6 @@ async def upload_csv(
 
 @router.get(
     "/{encoded_id}",
-    dependencies=[Depends(get_current_user)],
     response_model=FilePreviewResponse,
 )
 async def preview_csv(
@@ -121,7 +121,6 @@ async def preview_csv(
 
 @router.get(
     "/{encoded_id}/matches",
-    dependencies=[Depends(get_current_user)],
     response_model=FileMatchResponse,
 )
 async def preview_matches(
@@ -140,7 +139,6 @@ async def preview_matches(
 
 @router.post(
     "/{encoded_id}/matches",
-    dependencies=[Depends(get_current_user)],
     response_model=FileApplyResponse,
 )
 async def apply_matches(

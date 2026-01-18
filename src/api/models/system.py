@@ -13,3 +13,8 @@ class HealthResponse(BaseModel):
 class VersionResponse(BaseModel):
     version: str
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class BootstrapPayload(BaseModel):
+    username: str
+    password: str
