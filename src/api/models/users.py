@@ -15,3 +15,10 @@ class UserCreateRequest(BaseModel):
     username: str
     password: str
     is_superuser: bool = False
+
+
+class MeResponse(BaseModel):
+    id: UUID
+    username: str
+    is_active: bool
+    is_superuser: bool

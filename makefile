@@ -4,6 +4,9 @@ dev:
 test:
 	uv run pytest
 
+cov:
+	uv run pytest --cov
+
 commit:
 	uv run cz commit
 

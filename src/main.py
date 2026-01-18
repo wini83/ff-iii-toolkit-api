@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from api.routers.auth import router as auth_router
 from api.routers.blik_files import router as blik_router
+from api.routers.me import router as me_router
 from api.routers.system import init_system_router
 from api.routers.system import router as system_router
 from api.routers.tx import router as tx_router
@@ -56,3 +57,4 @@ app.include_router(blik_router)
 app.include_router(system_router)
 app.include_router(tx_router)
 app.include_router(users_router)
+app.include_router(me_router)

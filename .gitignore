@@ -127,6 +127,10 @@ fabric.properties
 
 __pycache__/
 
+# Python
+**/__pycache__/
+*.pyc
+
 .venv/
 .vscode/
 data-legacy/
