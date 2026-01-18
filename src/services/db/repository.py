@@ -22,6 +22,10 @@ class UserRepository:
     def count_users(self) -> int:
         return self.db.query(UserORM).count()
 
+    def list_all(self) -> list[User]:
+        rows = self.db.query(UserORM).all()
+        return [self._to_domain(r) for r in rows]
+
     def create(
         self,
         username: str,
@@ -40,10 +44,27 @@ class UserRepository:
         self.db.refresh(row)
         return self._to_domain(row)
 
+    def promote_to_superuser(self, user_id: UUID) -> None:
+        row = self.db.query(UserORM).filter(UserORM.id == user_id).one()
+        row.is_superuser = True
+        self.db.commit()
+
     def disable(self, user_id: UUID) -> None:
         row = self.db.query(UserORM).filter(UserORM.id == user_id).one()
         row.is_active = False
         self.db.commit()
+
+    def is_superuser(self, user_id: UUID) -> bool:
+        return (
+            self.db.query(UserORM)
+            .filter(
+                UserORM.id == user_id,
+                UserORM.is_superuser.is_(True),
+                UserORM.is_active.is_(True),
+            )
+            .count()
+            > 0
+        )
 
     @staticmethod
     def _to_domain(row: UserORM) -> User:

@@ -4,9 +4,13 @@ dev:
 test:
 	uv run pytest
 
-pre-commit:
+commit:
+	uv run cz commit
+
+pre:
 	uv run pre-commit run --all-files
 
 ruff:
 	uv run ruff check . --fix
 	uv run ruff format .
+	uv run black .
