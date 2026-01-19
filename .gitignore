@@ -127,6 +127,10 @@ fabric.properties
 
 __pycache__/
 
+# Python
+**/__pycache__/
+*.pyc
+
 .venv/
 .vscode/
 data-legacy/
@@ -134,3 +138,4 @@ data-legacy/
 .coverage
 coverage.xml
 htmlcov/
+data/app.db

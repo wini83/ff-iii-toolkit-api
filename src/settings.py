@@ -15,11 +15,10 @@ load_dotenv(ENV_PATH)
 class Settings(BaseSettings):
     FIREFLY_URL: str | None = None
     FIREFLY_TOKEN: str | None = None
-    USERS: str | None = None
     allowed_origins: Any = ["*"]
     DEMO_MODE: bool = False
 
-    SECRET_KEY: str = "not_set"
+    SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     BLIK_DESCRIPTION_FILTER: str = "BLIK - płatność w internecie"
@@ -28,6 +27,7 @@ class Settings(BaseSettings):
     REFRESH_COOKIE_NAME: str = "refresh_token"
     REFRESH_TOKEN_SECURE: bool = False
     log_level: str = "INFO"
+    database_url: str = "sqlite:///./data/app.db"
 
     @field_validator("allowed_origins", mode="before")
     def parse_allowed_origins(cls, v):
@@ -65,4 +65,5 @@ class Settings(BaseSettings):
     )
 
 
+# pyright: reportCallIssue=false
 settings = Settings()

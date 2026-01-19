@@ -16,11 +16,10 @@ class BaseMatchItem(Matchable):
     date: date
     amount: Decimal
 
+    def compare_amounts_abs(self, other: "Matchable") -> bool:
+        return abs(self.amount) == abs(other.amount)
+
     def compare(self, other: "Matchable") -> bool:
-        return self.date == other.date and abs(self.amount) == abs(other.amount)
-
-
-def add_line(existing: str | None, new_line: str) -> str:
-    if existing:
-        return existing + "\n" + new_line
-    return new_line
+        if not self.compare_amounts_abs(other=other):
+            return False
+        return self.date == other.date
