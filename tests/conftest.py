@@ -1,4 +1,5 @@
 import pytest
+from fastapi import Request
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -31,7 +32,7 @@ def db():
 def client(db):
     app = create_app()  # 👈 TESTOWA APPKA, BEZ BOOTSTRAPU
 
-    def override_get_db():
+    def override_get_db(request: Request):
         yield db
 
     app.dependency_overrides[get_db] = override_get_db
