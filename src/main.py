@@ -12,12 +12,15 @@ from api.routers.system import router as system_router
 from api.routers.tx import router as tx_router
 from api.routers.users import router as users_router
 from middleware import register_middlewares
-from services.db.init import init_db
+from services.db.engine import (
+    create_engine_from_url,
+    create_session_factory,
+)
+from services.db.init import DatabaseBootstrap
 from settings import settings
 from utils.logger import setup_logging
 
 setup_logging()
-
 logger = logging.getLogger(__name__)
 
 
@@ -28,33 +31,47 @@ def get_version() -> str:
     return data["project"]["version"]
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # STARTUP
-    init_db()
-    yield
-    # SHUTDOWN
-    # (tu kiedyś: engine.dispose(), close pools, etc.)
-
-
 APP_VERSION = get_version()
 
 
-logger.info("Settings loaded ")
-logger.info(f"Acces token expire: {settings.ACCESS_TOKEN_EXPIRE_MINUTES} minutes")
+# ==================================================
+# Application factory – ZERO side effects
+# ==================================================
 
 
-app = FastAPI(title="Firefly III Toolkit", version=APP_VERSION, lifespan=lifespan)
+def create_app(*, bootstrap: DatabaseBootstrap | None = None) -> FastAPI:
+    app = FastAPI(title="Firefly III Toolkit", version=APP_VERSION)
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        if bootstrap:
+            bootstrap.run()
+        yield
+
+    app.router.lifespan_context = lifespan
+
+    register_middlewares(app, settings)
+
+    app.include_router(auth_router)
+    app.include_router(blik_router)
+    app.include_router(system_router)
+    app.include_router(tx_router)
+    app.include_router(users_router)
+    app.include_router(me_router)
+
+    return app
 
 
-register_middlewares(app, settings)
+# ==================================================
+# Production composition root – ONLY HERE engine/db
+# ==================================================
 
-logger.info(f"Allowed_origins={settings.allowed_origins}")
 
+def create_production_app() -> FastAPI:
+    engine = create_engine_from_url(settings.database_url)
+    session_factory = create_session_factory(engine)
 
-app.include_router(auth_router)
-app.include_router(blik_router)
-app.include_router(system_router)
-app.include_router(tx_router)
-app.include_router(users_router)
-app.include_router(me_router)
+    app = create_app(bootstrap=DatabaseBootstrap(engine))
+    app.state.session_factory = session_factory
+
+    return app

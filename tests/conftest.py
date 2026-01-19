@@ -5,6 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from api.deps_db import get_db
+from main import create_app  # 👈 TO JEST KLUCZ
 from services.db.models import Base
 
 
@@ -28,10 +29,10 @@ def db():
 
 @pytest.fixture(scope="function")
 def client(db):
+    app = create_app()  # 👈 TESTOWA APPKA, BEZ BOOTSTRAPU
+
     def override_get_db():
         yield db
-
-    from main import app
 
     app.dependency_overrides[get_db] = override_get_db
 

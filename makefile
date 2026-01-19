@@ -1,6 +1,9 @@
 dev:
 	PYTHONPATH=src uv run uvicorn main:app --reload --app-dir src
 
+dev2:
+	PYTHONPATH=src uv run uvicorn main:create_production_app --factory --reload --app-dir src
+
 test:
 	uv run pytest
 

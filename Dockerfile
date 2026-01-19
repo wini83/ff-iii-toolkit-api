@@ -42,4 +42,7 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:8000/api/system/health || exit 1
 
 # Produkcyjny entrypoint
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "src.main:create_production_app", "--factory",
+    "--proxy-headers",
+     "--forwarded-allow-ips", "*",
+     "--host", "0.0.0.0", "--port", "8000"]
