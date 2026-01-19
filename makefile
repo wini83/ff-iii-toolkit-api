@@ -1,7 +1,4 @@
 dev:
-	PYTHONPATH=src uv run uvicorn main:app --reload --app-dir src
-
-dev2:
 	PYTHONPATH=src uv run uvicorn main:create_production_app --factory --reload --app-dir src
 
 test:
@@ -10,7 +7,7 @@ test:
 cov:
 	uv run pytest --cov
 
-commit:
+cmt:
 	uv run cz commit
 
 pre:
