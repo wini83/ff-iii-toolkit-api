@@ -128,6 +128,30 @@
 - **api**: - extract upload and file endpoints into separate routers - move csv parsing and transaction processing to services/ - add centralized logging and encoding utilities - introduce config module for env settings - create clean app entrypoint with router registration - improve project structure for scalability and maintainability
 - **all**: black isort ruff
 
+## v2.3.0 (2026-01-19)
+
+### Feat
+
+- add db engine
+- **auth**: add /me endpoint and enforce active users
+- **users**: add superuser-only user management API
+- **system**: add bootstrap endpoint and switch to argon2
+- **db**: dd user domain model and repository with SQLite support
+- **allegro**: add Allegro API adapter
+
+### Fix
+
+- **blik**: fixed potential path traversal by validating file identifiers and enforcing temp directory confinement
+- **blik**: prevent cache reset by using singleton BlikApplicationService
+
+### Refactor
+
+- **auth**: unify JWT config via settings to fix CI/local mismatch
+- **app**: switch to application factory and uvicorn --factory to fix CI bootstrap issues
+- **auth**: switch authentication from env users to database
+- refactor tx flow to application service and add service tests
+- reformat reflecting changes in ff client
+
 ## v2.2.7 (2026-01-16)
 
 ### Refactor
