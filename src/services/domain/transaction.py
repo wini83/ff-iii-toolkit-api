@@ -1,17 +1,8 @@
 from dataclasses import dataclass
+from decimal import Decimal
 from enum import Enum
 
 from services.domain.base import BaseMatchItem
-
-
-@dataclass(slots=True)
-class Transaction(BaseMatchItem):
-    id: int
-    description: str
-    tags: set[str]
-    notes: str | None
-    category: str | None
-    currency: str | None = "PLN"
 
 
 class TxTag(str, Enum):
@@ -21,10 +12,41 @@ class TxTag(str, Enum):
     action_req = "action_req"
 
 
+class TxType(str, Enum):
+    WITHDRAWAL = "withdrawal"
+    DEPOSIT = "deposit"
+    TRANSFER = "transfer"
+
+
 @dataclass
 class Category:
     id: int
     name: str
+
+
+@dataclass(slots=True, frozen=True)
+class Currency:
+    code: str
+    symbol: str
+    decimals: int
+
+
+@dataclass(slots=True, frozen=True)
+class FXContext:
+    original_currency: Currency
+    original_amount: Decimal
+
+
+@dataclass(slots=True)
+class Transaction(BaseMatchItem):
+    id: int
+    type: TxType
+    description: str
+    tags: set[str]
+    notes: str | None
+    category: Category | None
+    currency: Currency
+    fx: FXContext | None = None
 
 
 @dataclass

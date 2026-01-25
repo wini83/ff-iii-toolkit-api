@@ -1,30 +1,12 @@
 from collections.abc import Iterable
 
+from api.mappers.tx import map_tx_to_api
 from api.models.blik_files import MatchResult as ApiMatchResult
-from api.models.blik_files import SimplifiedRecord, SimplifiedTx, StatisticsResponse
+from api.models.blik_files import SimplifiedRecord, StatisticsResponse
 from services.domain.bank_record import BankRecord
 from services.domain.match_result import MatchResult as DomainMatchResult
 from services.domain.metrics import BlikStatisticsMetrics
 from services.domain.transaction import Transaction
-
-
-def map_tx_to_simplified(tx: Transaction) -> SimplifiedTx:
-    """
-    Domain Transaction -> API SimplifiedTx
-
-    Contract-stable.
-    UI-safe.
-    Deterministic.
-    """
-    return SimplifiedTx(
-        id=tx.id,
-        date=tx.date,
-        amount=float(tx.amount),
-        description=tx.description,
-        tags=sorted(tx.tags),  # set -> list, stabilna kolejność
-        notes=tx.notes or "",  # UI nie lubi None
-        category=tx.category or "",
-    )
 
 
 def map_bank_record_to_simplified(record: BankRecord) -> SimplifiedRecord:
@@ -90,7 +72,7 @@ def map_match_result_to_api(
     if not isinstance(result.tx, Transaction):
         raise TypeError(f"Expected Transaction as tx, got {type(result.tx).__name__}")
 
-    simplified_tx = map_tx_to_simplified(result.tx)
+    simplified_tx = map_tx_to_api(result.tx)
 
     records: list[BankRecord] = []
     for m in result.matches:

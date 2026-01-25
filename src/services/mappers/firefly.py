@@ -1,19 +1,44 @@
 from ff_iii_luciferin.api.transaction_update import TransactionUpdate as ff_tu
 from ff_iii_luciferin.domain.models import SimplifiedCategory, SimplifiedTx
 
-from services.domain.transaction import Category, Transaction, TransactionUpdate
+from services.domain.transaction import (
+    Category,
+    Currency,
+    FXContext,
+    Transaction,
+    TransactionUpdate,
+    TxType,
+)
 
 
 def tx_from_ff_tx(tx: SimplifiedTx) -> Transaction:
+    fx = None
+    if tx.fx is not None:
+        fx = FXContext(
+            original_currency=Currency(
+                code=tx.fx.original_currency.code,
+                symbol=tx.fx.original_currency.symbol,
+                decimals=tx.fx.original_currency.decimals,
+            ),
+            original_amount=tx.fx.original_amount,
+        )
     return Transaction(
         id=tx.id,
         date=tx.date,
         amount=tx.amount,
+        type=TxType(tx.type.value),
         description=tx.description,
         tags=set(tx.tags),
         notes=tx.notes,
-        category=tx.category,
-        currency="PLN",
+        category=(
+            Category(id=tx.category.id, name=tx.category.name) if tx.category else None
+        ),
+        currency=Currency(
+            code=tx.currency.code,
+            symbol=tx.currency.symbol,
+            decimals=tx.currency.decimals,
+        ),
+        fx=fx,
     )
 
 

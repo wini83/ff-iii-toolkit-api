@@ -7,8 +7,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from ff_iii_luciferin.api import FireflyAPIError
 
-from services.domain.transaction import Transaction, TransactionUpdate
+from services.domain.transaction import Currency, Transaction, TransactionUpdate, TxType
 from services.firefly_base_service import FireflyBaseService, FireflyServiceError
+
+DEFAULT_CURRENCY = Currency(code="PLN", symbol="zl", decimals=2)
 
 
 def test_fetch_transactions_excludes_categorized():
@@ -19,19 +21,25 @@ def test_fetch_transactions_excludes_categorized():
                 id=1,
                 date=date(2024, 1, 1),
                 amount=Decimal("10.00"),
+                type=SimpleNamespace(value="withdrawal"),
                 description="A",
                 tags=[],
                 notes=None,
                 category=None,
+                currency=SimpleNamespace(code="PLN", symbol="zl", decimals=2),
+                fx=None,
             ),
             SimpleNamespace(
                 id=2,
                 date=date(2024, 1, 2),
                 amount=Decimal("20.00"),
+                type=SimpleNamespace(value="withdrawal"),
                 description="B",
                 tags=[],
                 notes=None,
-                category="Food",
+                category=SimpleNamespace(id=1, name="Food"),
+                currency=SimpleNamespace(code="PLN", symbol="zl", decimals=2),
+                fx=None,
             ),
         ]
     )
@@ -74,10 +82,12 @@ def test_update_transaction_delegates_to_client():
         id=7,
         date=date(2024, 1, 1),
         amount=Decimal("10.00"),
+        type=TxType.WITHDRAWAL,
         description="Test",
         tags=set(),
         notes=None,
         category=None,
+        currency=DEFAULT_CURRENCY,
     )
     payload = TransactionUpdate(description="Updated")
 
@@ -94,10 +104,13 @@ def test_fetch_transactions_with_metrics_maps_stats():
             id=1,
             date=date(2024, 1, 1),
             amount=Decimal("10.00"),
+            type=SimpleNamespace(value="withdrawal"),
             description="A",
             tags=[],
             notes=None,
             category=None,
+            currency=SimpleNamespace(code="PLN", symbol="zl", decimals=2),
+            fx=None,
         )
     ]
     stats = SimpleNamespace(total=5, duration_ms=123, invalid=1, multipart=2)

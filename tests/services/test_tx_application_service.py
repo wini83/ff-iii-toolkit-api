@@ -5,11 +5,13 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from services.domain.transaction import Category, Transaction
+from services.domain.transaction import Category, Currency, Transaction, TxType
 from services.exceptions import ExternalServiceFailed
 from services.firefly_base_service import FireflyServiceError
 from services.firefly_tx_service import FireflyTxService
 from services.tx_application_service import TxApplicationService
+
+DEFAULT_CURRENCY = Currency(code="PLN", symbol="zl", decimals=2)
 
 
 def test_get_screening_month_returns_data_and_calls_services():
@@ -17,10 +19,12 @@ def test_get_screening_month_returns_data_and_calls_services():
         id=1,
         date=date(2024, 2, 5),
         amount=Decimal("12.50"),
+        type=TxType.WITHDRAWAL,
         description="Coffee",
         tags=set(),
         notes=None,
         category=None,
+        currency=DEFAULT_CURRENCY,
     )
     categories = [Category(id=10, name="Food")]
 
@@ -37,6 +41,7 @@ def test_get_screening_month_returns_data_and_calls_services():
         start_date=date(2024, 2, 1),
         end_date=date(2024, 2, 29),
     )
+    assert response is not None
     assert response.year == 2024
     assert response.month == 2
     assert response.remaining == 1

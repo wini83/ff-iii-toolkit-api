@@ -4,8 +4,16 @@ from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
 from services.domain.bank_record import BankRecord
-from services.domain.transaction import Transaction, TransactionUpdate, TxTag
+from services.domain.transaction import (
+    Currency,
+    Transaction,
+    TransactionUpdate,
+    TxTag,
+    TxType,
+)
 from services.firefly_enrichment_service import FireflyEnrichmentService
+
+DEFAULT_CURRENCY = Currency(code="PLN", symbol="zl", decimals=2)
 
 
 def test_match_filters_and_does_not_update_transactions():
@@ -17,28 +25,34 @@ def test_match_filters_and_does_not_update_transactions():
         id=1,
         date=date(2024, 1, 5),
         amount=Decimal("10.00"),
+        type=TxType.WITHDRAWAL,
         description="blik payment",
         tags=set(),
         notes=None,
         category=None,
+        currency=DEFAULT_CURRENCY,
     )
     tx_tagged = Transaction(
         id=2,
         date=date(2024, 1, 5),
         amount=Decimal("10.00"),
+        type=TxType.WITHDRAWAL,
         description="blik payment",
         tags={TxTag.blik_done},
         notes=None,
         category=None,
+        currency=DEFAULT_CURRENCY,
     )
     tx_other = Transaction(
         id=3,
         date=date(2024, 1, 5),
         amount=Decimal("10.00"),
+        type=TxType.WITHDRAWAL,
         description="other",
         tags=set(),
         notes=None,
         category=None,
+        currency=DEFAULT_CURRENCY,
     )
     service.fetch_transactions.return_value = [tx_match, tx_tagged, tx_other]
 
@@ -74,10 +88,12 @@ def test_apply_match_calls_update_transaction():
         id=1,
         date=date(2024, 1, 5),
         amount=Decimal("10.00"),
+        type=TxType.WITHDRAWAL,
         description="blik",
         tags=set(),
         notes=None,
         category=None,
+        currency=DEFAULT_CURRENCY,
     )
     payload = TransactionUpdate(description="updated")
     evidence = MagicMock()

@@ -7,9 +7,11 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from ff_iii_luciferin.api import FireflyAPIError
 
-from services.domain.transaction import Transaction, TxTag
+from services.domain.transaction import Currency, Transaction, TxTag, TxType
 from services.firefly_base_service import FireflyServiceError
 from services.firefly_tx_service import FireflyTxService
+
+DEFAULT_CURRENCY = Currency(code="PLN", symbol="zl", decimals=2)
 
 
 def test_get_txs_for_screening_filters_transactions():
@@ -22,46 +24,56 @@ def test_get_txs_for_screening_filters_transactions():
         id=1,
         date=date(2024, 1, 1),
         amount=Decimal("10.00"),
+        type=TxType.WITHDRAWAL,
         description="blik",
         tags=set(),
         notes=None,
         category=None,
+        currency=DEFAULT_CURRENCY,
     )
     tx_action_req = Transaction(
         id=2,
         date=date(2024, 1, 2),
         amount=Decimal("20.00"),
+        type=TxType.WITHDRAWAL,
         description="other",
         tags={TxTag.action_req},
         notes=None,
         category=None,
+        currency=DEFAULT_CURRENCY,
     )
     tx_allegro_pending = Transaction(
         id=3,
         date=date(2024, 1, 3),
         amount=Decimal("30.00"),
+        type=TxType.WITHDRAWAL,
         description="allegro order",
         tags=set(),
         notes=None,
         category=None,
+        currency=DEFAULT_CURRENCY,
     )
     tx_allegro_done = Transaction(
         id=4,
         date=date(2024, 1, 4),
         amount=Decimal("40.00"),
+        type=TxType.WITHDRAWAL,
         description="allegro order",
         tags={TxTag.allegro_done},
         notes=None,
         category=None,
+        currency=DEFAULT_CURRENCY,
     )
     tx_ok = Transaction(
         id=5,
         date=date(2024, 1, 5),
         amount=Decimal("50.00"),
+        type=TxType.WITHDRAWAL,
         description="groceries",
         tags=set(),
         notes=None,
         category=None,
+        currency=DEFAULT_CURRENCY,
     )
 
     service.fetch_transactions.return_value = [
@@ -127,10 +139,12 @@ def test_apply_category_by_id_delegates_to_helpers():
         id=9,
         date=date(2024, 1, 5),
         amount=Decimal("10.00"),
+        type=TxType.WITHDRAWAL,
         description="test",
         tags=set(),
         notes=None,
         category=None,
+        currency=DEFAULT_CURRENCY,
     )
     service.get_transaction = AsyncMock(return_value=tx)
     service.apply_category = AsyncMock()
