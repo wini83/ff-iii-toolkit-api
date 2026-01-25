@@ -1,5 +1,6 @@
 from datetime import date
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -16,7 +17,12 @@ class SimplifiedTx(SimplifiedItem):
     description: str
     tags: list[str]
     notes: str
-    category: str
+    category: str | None
+    currency_code: str
+    currency_symbol: str
+    type: Literal["withdrawal", "deposit", "transfer"]
+    fx_amount: float | None = None
+    fx_currency: str | None = None
 
 
 class SimplifiedCategory(BaseModel):
