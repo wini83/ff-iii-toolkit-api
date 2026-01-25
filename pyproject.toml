@@ -1,6 +1,6 @@
 [project]
 name = "ff-iii-toolkit-api"
-version = "2.3.1a0"
+version = "2.4.0b0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
