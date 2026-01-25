@@ -2,7 +2,9 @@ from datetime import date
 from decimal import Decimal
 
 from services.domain.bank_record import BankRecord
-from services.domain.transaction import Transaction, TxTag
+from services.domain.transaction import Currency, Transaction, TxTag, TxType
+
+DEFAULT_CURRENCY = Currency(code="PLN", symbol="zl", decimals=2)
 
 
 def test_pretty_print_only_meaningful_skips_empty_fields():
@@ -34,10 +36,12 @@ def test_build_tx_update_appends_description_notes_and_tags():
         id=1,
         date=date(2024, 1, 5),
         amount=Decimal("10.00"),
+        type=TxType.WITHDRAWAL,
         description="Payment",
         tags=set(),
         notes=None,
         category=None,
+        currency=DEFAULT_CURRENCY,
     )
 
     update = record.build_tx_update(tx)

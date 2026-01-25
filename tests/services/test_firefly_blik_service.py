@@ -5,8 +5,17 @@ from unittest.mock import AsyncMock, MagicMock
 
 from services.domain.bank_record import BankRecord
 from services.domain.metrics import FetchMetrics
-from services.domain.transaction import Transaction, TransactionUpdate, TxTag
+from services.domain.transaction import (
+    Category,
+    Currency,
+    Transaction,
+    TransactionUpdate,
+    TxTag,
+    TxType,
+)
 from services.firefly_blik_service import FireflyBlikService
+
+DEFAULT_CURRENCY = Currency(code="PLN", symbol="zl", decimals=2)
 
 
 def test_preview_matches_blik_transactions():
@@ -18,19 +27,23 @@ def test_preview_matches_blik_transactions():
         id=1,
         date=date(2024, 1, 5),
         amount=Decimal("10.00"),
+        type=TxType.WITHDRAWAL,
         description="blik payment",
         tags=set(),
         notes=None,
         category=None,
+        currency=DEFAULT_CURRENCY,
     )
     tx_tagged = Transaction(
         id=2,
         date=date(2024, 1, 5),
         amount=Decimal("10.00"),
+        type=TxType.WITHDRAWAL,
         description="blik payment",
         tags={TxTag.blik_done},
         notes=None,
         category=None,
+        currency=DEFAULT_CURRENCY,
     )
     service.fetch_transactions.return_value = [tx_match, tx_tagged]
 
@@ -63,46 +76,56 @@ def test_get_blik_metrics_aggregates_counts_and_months():
             id=1,
             date=date(2024, 1, 5),
             amount=Decimal("10.00"),
+            type=TxType.WITHDRAWAL,
             description="blik",
             tags=set(),
             notes=None,
             category=None,
+            currency=DEFAULT_CURRENCY,
         ),
         Transaction(
             id=2,
             date=date(2024, 1, 15),
             amount=Decimal("20.00"),
+            type=TxType.WITHDRAWAL,
             description="blik",
             tags={TxTag.blik_done},
             notes=None,
             category=None,
+            currency=DEFAULT_CURRENCY,
         ),
         Transaction(
             id=3,
             date=date(2024, 2, 1),
             amount=Decimal("5.00"),
+            type=TxType.WITHDRAWAL,
             description="blik groceries",
             tags=set(),
             notes=None,
             category=None,
+            currency=DEFAULT_CURRENCY,
         ),
         Transaction(
             id=4,
             date=date(2024, 2, 10),
             amount=Decimal("7.00"),
+            type=TxType.WITHDRAWAL,
             description="other",
             tags=set(),
             notes=None,
             category=None,
+            currency=DEFAULT_CURRENCY,
         ),
         Transaction(
             id=5,
             date=date(2024, 2, 12),
             amount=Decimal("30.00"),
+            type=TxType.WITHDRAWAL,
             description="blik",
             tags=set(),
             notes=None,
-            category="Food",
+            category=Category(id=1, name="Food"),
+            currency=DEFAULT_CURRENCY,
         ),
     ]
     metrics = FetchMetrics(
@@ -134,10 +157,12 @@ def test_apply_match_delegates_to_update_transaction():
         id=9,
         date=date(2024, 1, 5),
         amount=Decimal("10.00"),
+        type=TxType.WITHDRAWAL,
         description="blik",
         tags=set(),
         notes=None,
         category=None,
+        currency=DEFAULT_CURRENCY,
     )
     payload = TransactionUpdate(description="updated")
     evidence = MagicMock()

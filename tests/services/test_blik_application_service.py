@@ -10,7 +10,7 @@ from services.blik_application_service import BlikApplicationService
 from services.domain.bank_record import BankRecord
 from services.domain.match_result import MatchResult
 from services.domain.metrics import BlikStatisticsMetrics
-from services.domain.transaction import Transaction
+from services.domain.transaction import Currency, Transaction, TxType
 from services.exceptions import (
     ExternalServiceFailed,
     FileNotFound,
@@ -21,6 +21,8 @@ from services.firefly_base_service import FireflyServiceError
 from services.firefly_blik_service import FireflyBlikService
 from settings import settings
 from utils.encoding import encode_base64url
+
+DEFAULT_CURRENCY = Currency(code="PLN", symbol="zl", decimals=2)
 
 
 def test_upload_csv_returns_encoded_id_and_count():
@@ -106,28 +108,34 @@ def test_preview_matches_calls_service_and_returns_counts():
         id=1,
         date=date(2024, 1, 5),
         amount=Decimal("10.00"),
+        type=TxType.WITHDRAWAL,
         description="blik",
         tags=set(),
         notes=None,
         category=None,
+        currency=DEFAULT_CURRENCY,
     )
     tx2 = Transaction(
         id=2,
         date=date(2024, 1, 6),
         amount=Decimal("12.00"),
+        type=TxType.WITHDRAWAL,
         description="blik",
         tags=set(),
         notes=None,
         category=None,
+        currency=DEFAULT_CURRENCY,
     )
     tx3 = Transaction(
         id=3,
         date=date(2024, 1, 7),
         amount=Decimal("14.00"),
+        type=TxType.WITHDRAWAL,
         description="blik",
         tags=set(),
         notes=None,
         category=None,
+        currency=DEFAULT_CURRENCY,
     )
     matches = [
         MatchResult(tx=tx1, matches=[]),
@@ -213,10 +221,12 @@ def test_apply_matches_updates_transactions():
         id=1,
         date=date(2024, 1, 5),
         amount=Decimal("10.00"),
+        type=TxType.WITHDRAWAL,
         description="blik",
         tags=set(),
         notes=None,
         category=None,
+        currency=DEFAULT_CURRENCY,
     )
     evidence = BankRecord(
         date=date(2024, 1, 5),
@@ -249,10 +259,12 @@ def test_apply_matches_rejects_non_single_match():
         id=1,
         date=date(2024, 1, 5),
         amount=Decimal("10.00"),
+        type=TxType.WITHDRAWAL,
         description="blik",
         tags=set(),
         notes=None,
         category=None,
+        currency=DEFAULT_CURRENCY,
     )
     evidence_a = BankRecord(
         date=date(2024, 1, 5),

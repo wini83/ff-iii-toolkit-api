@@ -444,15 +444,15 @@ wheels = [
 
 [[package]]
 name = "ff-iii-luciferin"
-version = "1.0.0b2"
+version = "1.0.0b5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aenum" },
     { name = "httpx" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/18/13/0d08a9936f1d0e5990b1ea90cac01044c52f3b902ed0d2b7d53f251cd140/ff_iii_luciferin-1.0.0b2.tar.gz", hash = "sha256:6e2695617f4c49f29092eef5bfa7c9297998dae33a489e4dfcf35e40eb77a994", size = 87029, upload-time = "2026-01-08T20:15:32.394Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/75/0f/8ce90c4e6637e35d959ddf678948d8c122663862b8238abf726f3ad0d1f5/ff_iii_luciferin-1.0.0b5.tar.gz", hash = "sha256:77abe497caf7188e6e5075dd9dcf3f9850394964c52b394c783c235f0b1a93e8", size = 90997, upload-time = "2026-01-21T19:57:09.413Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ae/e5/35e29ee0b8fd39b50c6096011420bf16755ad8cb547b73f32c4e92a68b2d/ff_iii_luciferin-1.0.0b2-py3-none-any.whl", hash = "sha256:27c7954d8d1c666de235a4262beac6b87c95c379b258dfaf02f8fcec3d5d0bb5", size = 377152, upload-time = "2026-01-08T20:15:33.317Z" },
+    { url = "https://files.pythonhosted.org/packages/12/fe/c36115cf7772cea3a5c430949b6e285725f76494f84540f60742ce207a71/ff_iii_luciferin-1.0.0b5-py3-none-any.whl", hash = "sha256:502e701e69499ed6e8fe2913c819a2d06792ebf299e66d47a38f95b4e3e13c57", size = 431471, upload-time = "2026-01-21T19:57:07.882Z" },
 ]
 
 [[package]]
@@ -493,7 +493,7 @@ dev = [
 requires-dist = [
     { name = "argon2-cffi", specifier = ">=25.1.0" },
     { name = "fastapi", specifier = ">=0.121.2" },
-    { name = "ff-iii-luciferin", specifier = ">=1.0.0b2" },
+    { name = "ff-iii-luciferin", specifier = ">=1.0.0b5" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "pandas", specifier = ">=2.3.3" },
     { name = "pandas-stubs", specifier = ">=2.3.3.251201" },
