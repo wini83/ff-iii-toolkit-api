@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from api.deps_db import get_db
@@ -8,8 +8,6 @@ from services.db.repository import UserRepository
 from services.system.bootstrap import BootstrapAlreadyDone, BootstrapService
 
 router = APIRouter(prefix="/api/system", tags=["system"])
-
-APP_VERSION: str | None = None
 
 
 def init_system_router(version: str):
@@ -24,8 +22,9 @@ async def health_check():
 
 
 @router.get("/version", response_model=VersionResponse)
-async def version_check():
-    return VersionResponse(version=APP_VERSION or "unknown")
+async def version_check(request: Request):
+    version = getattr(request.app.state, "version", "unknown")
+    return VersionResponse(version=version)
 
 
 @router.post("/bootstrap", status_code=201)
