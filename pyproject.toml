@@ -65,6 +65,12 @@ addopts = "-ra"
 target-version = "py312"
 line-length = 88
 fix = true
+exclude = [
+  ".venv",
+  "venv",
+  "alembic/versions",
+]
+
 
 [tool.ruff.lint]
 select = [
@@ -103,3 +109,12 @@ omit = [
 show_missing = true
 skip_empty = true
 fail_under = 70
+
+[tool.black]
+exclude = '''
+/(
+    \.venv
+  | venv
+  | alembic/versions
+)/
+'''
