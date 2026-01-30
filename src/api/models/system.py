@@ -1,11 +1,12 @@
 from datetime import UTC, datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
 
 class HealthResponse(BaseModel):
-    status: str = "ok"
-    database: str | None = None
+    status: Literal["ok", "degraded", "error"]
+    database: Literal["ok", "error"]
     external_services: dict[str, str] | None = None
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
@@ -13,6 +14,10 @@ class HealthResponse(BaseModel):
 class VersionResponse(BaseModel):
     version: str
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class BootstrapResponse(BaseModel):
+    bootstrapped: bool
 
 
 class BootstrapPayload(BaseModel):
