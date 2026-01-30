@@ -1,7 +1,6 @@
 # services/db/init.py
+from sqlalchemy import text
 from sqlalchemy.engine import Engine
-
-from services.db.models import Base
 
 
 class DatabaseBootstrap:
@@ -9,4 +8,18 @@ class DatabaseBootstrap:
         self.engine = engine
 
     def run(self) -> None:
-        Base.metadata.create_all(bind=self.engine)
+        with self.engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+
+            # sanity check: czy migracje były uruchomione
+            result = conn.execute(
+                text(
+                    "SELECT 1 FROM sqlite_master "
+                    "WHERE type='table' AND name='alembic_version'"
+                )
+            ).scalar()
+
+        if not result:
+            raise RuntimeError(
+                "Database schema not initialized. Run `alembic upgrade head` first."
+            )
