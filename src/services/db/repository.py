@@ -3,7 +3,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from services.db.models import UserORM
+from services.db.models import AuditLogORM, UserORM
 from services.domain.user import User
 
 
@@ -75,3 +75,25 @@ class UserRepository:
             is_superuser=row.is_superuser,
             is_active=row.is_active,
         )
+
+
+class AuditLogRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def log(
+        self,
+        *,
+        actor_id: UUID,
+        action: str,
+        target_id: UUID | None = None,
+        metadata: dict | None = None,
+    ) -> None:
+        row = AuditLogORM(
+            actor_id=actor_id,
+            action=action,
+            target_id=target_id,
+            metadata=metadata,
+        )
+        self.db.add(row)
+        self.db.commit()

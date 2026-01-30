@@ -1,3 +1,4 @@
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
@@ -6,7 +7,7 @@ from sqlalchemy.orm import Session
 from api.deps_db import get_db
 from api.models.users import UserCreateRequest, UserResponse
 from services.db.passwords import hash_password
-from services.db.repository import UserRepository
+from services.db.repository import AuditLogRepository, UserRepository
 from services.guards import require_superuser
 
 router = APIRouter(
@@ -32,6 +33,7 @@ def list_users(
 )
 def create_user(
     payload: UserCreateRequest,
+    admin_id: Annotated[UUID, Depends(require_superuser)],
     db: Session = Depends(get_db),
 ):
     repo = UserRepository(db)
@@ -41,7 +43,8 @@ def create_user(
         password_hash=hash_password(payload.password),
         is_superuser=payload.is_superuser,
     )
-
+    audit = AuditLogRepository(db)
+    audit.log(actor_id=admin_id, action="user.create", target_id=user.id)
     return user
 
 
@@ -51,11 +54,14 @@ def create_user(
 )
 def disable_user(
     user_id: UUID,
+    admin_id: Annotated[UUID, Depends(require_superuser)],
     db: Session = Depends(get_db),
 ):
     repo = UserRepository(db)
 
     repo.disable(user_id)
+    audit = AuditLogRepository(db)
+    audit.log(actor_id=admin_id, action="user.disable", target_id=user_id)
 
 
 @router.post(
@@ -64,7 +70,10 @@ def disable_user(
 )
 def promote_user(
     user_id: UUID,
+    admin_id: Annotated[UUID, Depends(require_superuser)],
     db: Session = Depends(get_db),
 ):
     repo = UserRepository(db)
     repo.promote_to_superuser(user_id)
+    audit = AuditLogRepository(db)
+    audit.log(actor_id=admin_id, action="user.promote", target_id=user_id)

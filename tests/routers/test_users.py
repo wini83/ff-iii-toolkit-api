@@ -1,4 +1,5 @@
 from api.routers.auth import create_access_token
+from services.db.models import AuditLogORM
 from services.db.repository import UserRepository
 
 
@@ -13,6 +14,18 @@ def _create_superuser(db, username: str = "admin"):
         username=username,
         password_hash="hashed",
         is_superuser=True,
+    )
+
+
+def _find_audit_log(db, *, action: str, actor_id, target_id):
+    return (
+        db.query(AuditLogORM)
+        .filter(
+            AuditLogORM.action == action,
+            AuditLogORM.actor_id == actor_id,
+            AuditLogORM.target_id == target_id,
+        )
+        .one_or_none()
     )
 
 
@@ -68,6 +81,15 @@ def test_create_user_happy_path(client, db):
     assert stored is not None
     assert stored.password_hash != "secret"
 
+    # 🔍 AUDIT LOG
+    log = _find_audit_log(
+        db,
+        action="user.create",
+        actor_id=superuser.id,
+        target_id=stored.id,
+    )
+    assert log is not None
+
 
 def test_disable_user_happy_path(client, db):
     repo = UserRepository(db)
@@ -84,7 +106,17 @@ def test_disable_user_happy_path(client, db):
     )
 
     assert response.status_code == 204
-    assert repo.get_by_id(target.id).is_active is False
+    user = repo.get_by_id(target.id)
+    assert user is not None
+    assert user.is_active is False
+
+    log = _find_audit_log(
+        db,
+        action="user.disable",
+        actor_id=superuser.id,
+        target_id=target.id,
+    )
+    assert log is not None
 
 
 def test_promote_user_happy_path(client, db):
@@ -102,4 +134,14 @@ def test_promote_user_happy_path(client, db):
     )
 
     assert response.status_code == 204
-    assert repo.get_by_id(target.id).is_superuser is True
+    user = repo.get_by_id(target.id)
+    assert user is not None
+    assert user.is_superuser is True
+
+    log = _find_audit_log(
+        db,
+        action="user.promote",
+        actor_id=superuser.id,
+        target_id=target.id,
+    )
+    assert log is not None
