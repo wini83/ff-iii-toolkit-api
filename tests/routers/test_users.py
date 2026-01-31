@@ -119,6 +119,35 @@ def test_disable_user_happy_path(client, db):
     assert log is not None
 
 
+def test_enable_user_happy_path(client, db):
+    repo = UserRepository(db)
+    superuser = _create_superuser(db)
+    target = repo.create(
+        username="target",
+        password_hash="hashed",
+        is_superuser=False,
+    )
+    repo.disable(target.id)
+
+    response = client.post(
+        f"/api/users/{target.id}/enable",
+        headers=_auth_header(str(superuser.id)),
+    )
+
+    assert response.status_code == 204
+    user = repo.get_by_id(target.id)
+    assert user is not None
+    assert user.is_active is True
+
+    log = _find_audit_log(
+        db,
+        action="user.enable",
+        actor_id=superuser.id,
+        target_id=target.id,
+    )
+    assert log is not None
+
+
 def test_promote_user_happy_path(client, db):
     repo = UserRepository(db)
     superuser = _create_superuser(db)
@@ -141,6 +170,61 @@ def test_promote_user_happy_path(client, db):
     log = _find_audit_log(
         db,
         action="user.promote",
+        actor_id=superuser.id,
+        target_id=target.id,
+    )
+    assert log is not None
+
+
+def test_demote_user_happy_path(client, db):
+    repo = UserRepository(db)
+    superuser = _create_superuser(db)
+    target = repo.create(
+        username="target",
+        password_hash="hashed",
+        is_superuser=True,
+    )
+
+    response = client.post(
+        f"/api/users/{target.id}/demote",
+        headers=_auth_header(str(superuser.id)),
+    )
+
+    assert response.status_code == 204
+    user = repo.get_by_id(target.id)
+    assert user is not None
+    assert user.is_superuser is False
+
+    log = _find_audit_log(
+        db,
+        action="user.demote",
+        actor_id=superuser.id,
+        target_id=target.id,
+    )
+    assert log is not None
+
+
+def test_delete_user_happy_path(client, db):
+    repo = UserRepository(db)
+    superuser = _create_superuser(db)
+    target = repo.create(
+        username="target",
+        password_hash="hashed",
+        is_superuser=False,
+    )
+
+    response = client.delete(
+        f"/api/users/{target.id}",
+        headers=_auth_header(str(superuser.id)),
+    )
+
+    assert response.status_code == 204
+    user = repo.get_by_id(target.id)
+    assert user is None
+
+    log = _find_audit_log(
+        db,
+        action="user.delete",
         actor_id=superuser.id,
         target_id=target.id,
     )

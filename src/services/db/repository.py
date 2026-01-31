@@ -49,9 +49,24 @@ class UserRepository:
         row.is_superuser = True
         self.db.commit()
 
+    def demote_from_superuser(self, user_id: UUID) -> None:
+        row = self.db.query(UserORM).filter(UserORM.id == user_id).one()
+        row.is_superuser = False
+        self.db.commit()
+
     def disable(self, user_id: UUID) -> None:
         row = self.db.query(UserORM).filter(UserORM.id == user_id).one()
         row.is_active = False
+        self.db.commit()
+
+    def enable(self, user_id: UUID) -> None:
+        row = self.db.query(UserORM).filter(UserORM.id == user_id).one()
+        row.is_active = True
+        self.db.commit()
+
+    def delete(self, user_id: UUID) -> None:
+        row = self.db.query(UserORM).filter(UserORM.id == user_id).one()
+        self.db.delete(row)
         self.db.commit()
 
     def is_superuser(self, user_id: UUID) -> bool:

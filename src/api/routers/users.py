@@ -65,6 +65,22 @@ def disable_user(
 
 
 @router.post(
+    "/{user_id}/enable",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def enable_user(
+    user_id: UUID,
+    admin_id: Annotated[UUID, Depends(require_superuser)],
+    db: Session = Depends(get_db),
+):
+    repo = UserRepository(db)
+
+    repo.enable(user_id)
+    audit = AuditLogRepository(db)
+    audit.log(actor_id=admin_id, action="user.enable", target_id=user_id)
+
+
+@router.post(
     "/{user_id}/promote",
     status_code=status.HTTP_204_NO_CONTENT,
 )
@@ -77,3 +93,33 @@ def promote_user(
     repo.promote_to_superuser(user_id)
     audit = AuditLogRepository(db)
     audit.log(actor_id=admin_id, action="user.promote", target_id=user_id)
+
+
+@router.post(
+    "/{user_id}/demote",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def demote_user(
+    user_id: UUID,
+    admin_id: Annotated[UUID, Depends(require_superuser)],
+    db: Session = Depends(get_db),
+):
+    repo = UserRepository(db)
+    repo.demote_from_superuser(user_id)
+    audit = AuditLogRepository(db)
+    audit.log(actor_id=admin_id, action="user.demote", target_id=user_id)
+
+
+@router.delete(
+    "/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_user(
+    user_id: UUID,
+    admin_id: Annotated[UUID, Depends(require_superuser)],
+    db: Session = Depends(get_db),
+):
+    repo = UserRepository(db)
+    repo.delete(user_id)
+    audit = AuditLogRepository(db)
+    audit.log(actor_id=admin_id, action="user.delete", target_id=user_id)
