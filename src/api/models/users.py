@@ -1,4 +1,5 @@
 # api/models/users.py
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -22,3 +23,18 @@ class MeResponse(BaseModel):
     username: str
     is_active: bool
     is_superuser: bool
+
+
+class AuditLogItem(BaseModel):
+    id: UUID
+    actor_id: UUID
+    action: str
+    target_id: UUID | None
+    meta: dict | None
+    created_at: datetime
+
+
+class AuditLogResponse(BaseModel):
+    items: list[AuditLogItem]
+    limit: int
+    offset: int
