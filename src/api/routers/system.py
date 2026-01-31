@@ -29,6 +29,7 @@ async def health_check(
     request: Request,
     response: Response,
     db: Session = Depends(get_db),
+    db_service: BootstrapService = Depends(get_bootstrap_service),
 ):
     db_status = "ok"
     overall_status = "ok"
@@ -41,7 +42,11 @@ async def health_check(
     if overall_status == "error":
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
 
-    return HealthResponse(status=overall_status, database=db_status)
+    bootstrapped = db_service.is_bootstrapped()
+
+    return HealthResponse(
+        status=overall_status, database=db_status, bootstrapped=bootstrapped
+    )
 
 
 @router.get("/version", response_model=VersionResponse)

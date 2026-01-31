@@ -8,6 +8,7 @@ class HealthResponse(BaseModel):
     status: Literal["ok", "degraded", "error"]
     database: Literal["ok", "error"]
     external_services: dict[str, str] | None = None
+    bootstrapped: bool
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
