@@ -305,7 +305,7 @@ def test_get_statistics_fetches_once_and_caches():
         time_stamp=datetime(2024, 1, 1),
     )
     blik_service = MagicMock(spec=FireflyBlikService)
-    blik_service.fetch_blik_metrics = AsyncMock(return_value=metrics)
+    blik_service.fetch_metrics = AsyncMock(return_value=metrics)
     service = BlikApplicationService(blik_service=blik_service)
 
     async def run():
@@ -315,6 +315,6 @@ def test_get_statistics_fetches_once_and_caches():
 
     stats_first, stats_second = asyncio.run(run())
 
-    assert blik_service.fetch_blik_metrics.await_count == 1
+    assert blik_service.fetch_metrics.await_count == 1
     assert stats_first.total_transactions == 10
     assert stats_second.filtered_by_description_exact == 3

@@ -1,22 +1,30 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Protocol
 
 from services.domain.metrics import BaseMetrics
-from services.firefly_base_service import FireflyServiceError
-from services.tx_stats.models import TxStatsJob
+from services.tx_stats.models import JobStatus, MetricsState
 
 
-class TxService(Protocol):
-    async def fetch_metrics(self) -> BaseMetrics: ...
+class MetricsProvider[T: BaseMetrics](Protocol):
+    async def fetch_metrics(self) -> T: ...
 
 
-async def run_tx_stats_job(job: TxStatsJob, tx_service: TxService) -> None:
-    """Run a stats job asynchronously using the provided transaction service."""
-
-    job.mark_running()
+async def recompute_metrics[T: BaseMetrics](
+    state: MetricsState[T],
+    provider: MetricsProvider[T],
+) -> None:
+    state.status = JobStatus.RUNNING
+    state.progress = "fetching"
+    state.error = None
     try:
-        result = await tx_service.fetch_metrics()
-        job.mark_done(result)
-    except FireflyServiceError as exc:
-        job.mark_failed(str(exc))
+        result = await provider.fetch_metrics()
+        state.result = result
+        state.status = JobStatus.DONE
+        state.last_updated_at = datetime.now(UTC)
+        state.progress = None
+    except Exception as exc:
+        state.status = JobStatus.FAILED
+        state.error = str(exc)
+        state.progress = None
