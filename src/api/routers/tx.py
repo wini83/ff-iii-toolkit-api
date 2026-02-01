@@ -1,8 +1,7 @@
-from uuid import UUID
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.deps_runtime import get_tx_application_runtime
+from api.mappers.tx_stats import map_tx_state_to_response
 from api.models.tx import ScreeningMonthResponse, TxTag
 from api.models.tx_stats import TxMetricsStatusResponse
 from services.exceptions import ExternalServiceFailed
@@ -10,8 +9,7 @@ from services.guards import require_active_user
 from services.tx_application_service import TxApplicationService
 
 router = APIRouter(
-    prefix="/api/tx",
-    tags=["transactions"],
+    prefix="/api/tx", tags=["transactions"], dependencies=[Depends(require_active_user)]
 )
 
 
@@ -33,7 +31,6 @@ router = APIRouter(
 async def get_screening_month(
     year: int = Query(..., ge=2000, le=2100),
     month: int = Query(..., ge=1, le=12),
-    user_id: UUID = Depends(require_active_user),
     svc: TxApplicationService = Depends(get_tx_application_runtime),
 ):
     try:
@@ -52,7 +49,6 @@ async def get_screening_month(
 async def apply_category(
     tx_id: int,
     category_id: int,
-    user_id: UUID = Depends(require_active_user),
     svc: TxApplicationService = Depends(get_tx_application_runtime),
 ):
     try:
@@ -68,7 +64,6 @@ async def apply_category(
 async def apply_tag(
     tx_id: int,
     tag: TxTag = Query(...),
-    user_id: UUID = Depends(require_active_user),
     svc: TxApplicationService = Depends(get_tx_application_runtime),
 ):
     try:
@@ -82,10 +77,10 @@ async def apply_tag(
     response_model=TxMetricsStatusResponse,
 )
 async def get_tx_stats(
-    user_id: UUID = Depends(require_active_user),
     svc: TxApplicationService = Depends(get_tx_application_runtime),
 ):
-    return await svc.get_tx_metrics()
+    state = await svc.get_tx_metrics()
+    return map_tx_state_to_response(state)
 
 
 @router.post(
@@ -93,7 +88,7 @@ async def get_tx_stats(
     response_model=TxMetricsStatusResponse,
 )
 async def refresh_tx_stats(
-    user_id: UUID = Depends(require_active_user),
     svc: TxApplicationService = Depends(get_tx_application_runtime),
 ):
-    return await svc.refresh_tx_metrics()
+    state = await svc.refresh_tx_metrics()
+    return map_tx_state_to_response(state)

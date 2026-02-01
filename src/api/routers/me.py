@@ -9,8 +9,7 @@ from services.db.repository import UserRepository
 from services.guards import require_active_user
 
 router = APIRouter(
-    prefix="/api/me",
-    tags=["me"],
+    prefix="/api/me", tags=["me"], dependencies=[Depends(require_active_user)]
 )
 
 

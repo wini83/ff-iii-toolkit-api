@@ -14,6 +14,7 @@ class BlikMetricsResultResponse(BaseModel):
     not_processed_by_month: dict[str, int]
     inclomplete_procesed_by_month: dict[str, int]
     time_stamp: datetime
+    fetch_seconds: float
 
 
 class BlikMetricsStatusResponse(BaseModel):

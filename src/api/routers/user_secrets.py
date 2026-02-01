@@ -10,6 +10,7 @@ from services.user_secrets_service import UserSecretsService
 router = APIRouter(
     prefix="/api/user-secrets",
     tags=["user-secrets"],
+    dependencies=[Depends(require_active_user)],
 )
 
 

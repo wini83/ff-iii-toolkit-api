@@ -16,6 +16,7 @@ class TxMetricsResultResponse(BaseModel):
     categorizable: int
     categorizable_by_month: dict[str, int]
     time_stamp: datetime
+    fetch_seconds: float
 
 
 class TxMetricsStatusResponse(BaseModel):

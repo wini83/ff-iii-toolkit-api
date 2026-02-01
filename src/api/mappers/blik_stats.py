@@ -20,6 +20,7 @@ def map_blik_metrics_state_to_response(
             not_processed_by_month=state.result.not_processed_by_month,
             inclomplete_procesed_by_month=state.result.inclomplete_procesed_by_month,
             time_stamp=state.result.time_stamp,
+            fetch_seconds=state.result.fetching_duration_ms / 1000.0,
         )
 
     return BlikMetricsStatusResponse(

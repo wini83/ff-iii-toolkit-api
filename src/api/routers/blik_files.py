@@ -1,5 +1,4 @@
 import logging
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
@@ -28,6 +27,7 @@ from services.guards import require_active_user
 router = APIRouter(
     prefix="/api/blik_files",
     tags=["blik-files"],
+    dependencies=[Depends(require_active_user)],
 )
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,6 @@ logger = logging.getLogger(__name__)
     deprecated=True,
 )
 async def get_statistics(
-    user_id: UUID = Depends(require_active_user),
     svc: BlikApplicationService = Depends(get_blik_application_runtime),
 ):
     try:
@@ -58,7 +57,6 @@ async def get_statistics(
     deprecated=True,
 )
 async def refresh_statistics(
-    user_id: UUID = Depends(require_active_user),
     svc: BlikApplicationService = Depends(get_blik_application_runtime),
 ):
     try:
@@ -72,7 +70,6 @@ async def refresh_statistics(
     response_model=BlikMetricsStatusResponse,
 )
 async def get_statistics_current(
-    user_id: UUID = Depends(require_active_user),
     svc: BlikApplicationService = Depends(get_blik_application_runtime),
 ):
     state = svc.get_metrics_state()
@@ -84,7 +81,6 @@ async def get_statistics_current(
     response_model=BlikMetricsStatusResponse,
 )
 async def refresh_statistics_current(
-    user_id: UUID = Depends(require_active_user),
     svc: BlikApplicationService = Depends(get_blik_application_runtime),
 ):
     state = await svc.refresh_metrics_state()
@@ -97,7 +93,6 @@ async def refresh_statistics_current(
 )
 async def upload_csv(
     file: UploadFile = File(...),
-    user_id: UUID = Depends(require_active_user),
     svc: BlikApplicationService = Depends(get_blik_application_runtime),
 ):
     content = await file.read()
@@ -110,7 +105,6 @@ async def upload_csv(
 )
 async def preview_csv(
     encoded_id: str,
-    user_id: UUID = Depends(require_active_user),
     svc: BlikApplicationService = Depends(get_blik_application_runtime),
 ):
     try:
@@ -127,7 +121,6 @@ async def preview_csv(
 )
 async def preview_matches(
     encoded_id: str,
-    user_id: UUID = Depends(require_active_user),
     svc: BlikApplicationService = Depends(get_blik_application_runtime),
 ):
     try:
@@ -147,7 +140,6 @@ async def preview_matches(
 async def apply_matches(
     encoded_id: str,
     payload: ApplyPayload,
-    user_id: UUID = Depends(require_active_user),
     svc: BlikApplicationService = Depends(get_blik_application_runtime),
 ):
     try:

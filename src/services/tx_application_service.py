@@ -6,7 +6,6 @@ from api.models.tx import (
     ScreeningMonthResponse,
     TxTag,
 )
-from api.models.tx_stats import TxMetricsResultResponse, TxMetricsStatusResponse
 from services.domain.metrics import TXStatisticsMetrics
 from services.exceptions import ExternalServiceFailed
 from services.firefly_base_service import FireflyServiceError
@@ -77,37 +76,13 @@ class TxApplicationService:
     # METRICS
     # --------------------------------------------------
 
-    async def get_tx_metrics(self) -> TxMetricsStatusResponse:
+    async def get_tx_metrics(self) -> MetricsState[TXStatisticsMetrics]:
         state = self.tx_metrics_manager.get_state()
-        return self._map_state_to_response(state)
+        return state
 
-    async def refresh_tx_metrics(self) -> TxMetricsStatusResponse:
+    async def refresh_tx_metrics(self) -> MetricsState[TXStatisticsMetrics]:
         state = await self.tx_metrics_manager.refresh()
-        return self._map_state_to_response(state)
-
-    @staticmethod
-    def _map_state_to_response(
-        state: MetricsState[TXStatisticsMetrics],
-    ) -> TxMetricsStatusResponse:
-        result = None
-        if state.result is not None:
-            result = TxMetricsResultResponse(
-                single_part_transactions=state.result.single_part_transactions,
-                uncategorized_transactions=state.result.uncategorized_transactions,
-                blik_not_ok=state.result.blik_not_ok,
-                action_req=state.result.action_req,
-                allegro_not_ok=state.result.allegro_not_ok,
-                categorizable=state.result.categorizable,
-                categorizable_by_month=state.result.categorizable_by_month,
-                time_stamp=state.result.time_stamp,
-            )
-
-        return TxMetricsStatusResponse(
-            status=state.status.value,
-            progress=state.progress,
-            result=result,
-            error=state.error,
-        )
+        return state
 
     # --------------------------------------------------
     # INTERNAL HELPERS

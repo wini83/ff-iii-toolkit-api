@@ -18,14 +18,12 @@ from services.db.repository import AuditLogRepository, UserRepository
 from services.guards import require_superuser
 
 router = APIRouter(
-    prefix="/api/users",
-    tags=["users"],
+    prefix="/api/users", tags=["users"], dependencies=[Depends(require_superuser)]
 )
 
 
 @router.get("", response_model=list[UserResponse])
 def list_users(
-    admin_id: UUID = Depends(require_superuser),
     db: Session = Depends(get_db),
 ):
     repo = UserRepository(db)
@@ -134,7 +132,6 @@ def delete_user(
 
 @router.get("/audit-log", response_model=AuditLogResponse)
 def list_audit_log(
-    admin_id: UUID = Depends(require_superuser),
     actor_id: UUID | None = None,
     target_id: UUID | None = None,
     action: str | None = None,
