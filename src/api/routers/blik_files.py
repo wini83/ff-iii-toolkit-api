@@ -4,6 +4,7 @@ from functools import lru_cache
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from ff_iii_luciferin.api import FireflyClient
 
+from api.mappers.blik_stats import map_blik_metrics_state_to_response
 from api.models.blik_files import (
     ApplyPayload,
     FileApplyResponse,
@@ -12,7 +13,9 @@ from api.models.blik_files import (
     StatisticsResponse,
     UploadResponse,
 )
+from api.models.blik_stats import BlikMetricsStatusResponse
 from services.blik_application_service import BlikApplicationService
+from services.blik_stats.manager import BlikMetricsManager
 from services.exceptions import (
     ExternalServiceFailed,
     FileNotFound,
@@ -60,6 +63,28 @@ def blik_service_dep() -> BlikApplicationService:
     return blik_service_singleton()
 
 
+@lru_cache(maxsize=1)
+def blik_metrics_manager_singleton() -> BlikMetricsManager:
+    if not settings.FIREFLY_URL or not settings.FIREFLY_TOKEN:
+        raise RuntimeError("Config error")
+
+    client = FireflyClient(
+        base_url=settings.FIREFLY_URL,
+        token=settings.FIREFLY_TOKEN,
+    )
+
+    blik_service = FireflyBlikService(
+        client,
+        settings.BLIK_DESCRIPTION_FILTER,
+    )
+
+    return BlikMetricsManager(blik_service=blik_service)
+
+
+def blik_metrics_manager_dep() -> BlikMetricsManager:
+    return blik_metrics_manager_singleton()
+
+
 # --------------------------------------------------
 # Endpoints
 # --------------------------------------------------
@@ -68,6 +93,7 @@ def blik_service_dep() -> BlikApplicationService:
 @router.get(
     "/statistics",
     response_model=StatisticsResponse,
+    deprecated=True,
 )
 async def get_statistics(
     svc: BlikApplicationService = Depends(blik_service_dep),
@@ -81,6 +107,7 @@ async def get_statistics(
 @router.post(
     "/statistics/refresh",
     response_model=StatisticsResponse,
+    deprecated=True,
 )
 async def refresh_statistics(
     svc: BlikApplicationService = Depends(blik_service_dep),
@@ -89,6 +116,28 @@ async def refresh_statistics(
         return await svc.get_statistics(refresh=True)
     except ExternalServiceFailed as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
+
+
+@router.get(
+    "/statistics_v2",
+    response_model=BlikMetricsStatusResponse,
+)
+async def get_statistics_current(
+    manager: BlikMetricsManager = Depends(blik_metrics_manager_dep),
+):
+    state = manager.get_state()
+    return map_blik_metrics_state_to_response(state)
+
+
+@router.post(
+    "/statistics_v2/refresh",
+    response_model=BlikMetricsStatusResponse,
+)
+async def refresh_statistics_current(
+    manager: BlikMetricsManager = Depends(blik_metrics_manager_dep),
+):
+    state = await manager.refresh()
+    return map_blik_metrics_state_to_response(state)
 
 
 @router.post(
