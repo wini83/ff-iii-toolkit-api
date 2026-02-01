@@ -18,9 +18,11 @@ from api.models.blik_files import (
     StatisticsResponse,
     UploadResponse,
 )
+from services.blik_stats.manager import BlikMetricsManager
 from services.csv_reader import BankCSVReader
 from services.domain.bank_record import BankRecord
 from services.domain.match_result import MatchResult
+from services.domain.metrics import BlikStatisticsMetrics
 from services.domain.transaction import Transaction
 from services.exceptions import (
     ExternalServiceFailed,
@@ -32,6 +34,7 @@ from services.exceptions import (
 )
 from services.firefly_base_service import FireflyServiceError
 from services.firefly_blik_service import FireflyBlikService
+from services.tx_stats.models import MetricsState
 from settings import settings
 from utils.encoding import decode_base64url, encode_base64url
 
@@ -57,6 +60,7 @@ class BlikApplicationService:
         blik_service: FireflyBlikService,
     ) -> None:
         self.blik_service = blik_service
+        self.blik_metrics_manager = BlikMetricsManager(blik_service=blik_service)
 
         self._matches_cache: dict[str, list[MatchResult]] = {}
         self._stats_cache: StatisticsResponse | None = None
@@ -193,6 +197,16 @@ class BlikApplicationService:
                     raise ExternalServiceFailed(str(e)) from e
                 self._stats_cache = map_blik_metrics_to_api(domain_metrics)
         return self._stats_cache
+
+    # --------------------------------------------------
+    # METRICS V2
+    # --------------------------------------------------
+
+    def get_metrics_state(self) -> MetricsState[BlikStatisticsMetrics]:
+        return self.blik_metrics_manager.get_state()
+
+    async def refresh_metrics_state(self) -> MetricsState[BlikStatisticsMetrics]:
+        return await self.blik_metrics_manager.refresh()
 
     # --------------------------------------------------
     # INTERNAL HELPERS

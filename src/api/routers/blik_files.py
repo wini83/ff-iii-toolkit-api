@@ -1,9 +1,9 @@
 import logging
-from functools import lru_cache
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from ff_iii_luciferin.api import FireflyClient
 
+from api.deps_runtime import get_blik_application_runtime
 from api.mappers.blik_stats import map_blik_metrics_state_to_response
 from api.models.blik_files import (
     ApplyPayload,
@@ -15,7 +15,6 @@ from api.models.blik_files import (
 )
 from api.models.blik_stats import BlikMetricsStatusResponse
 from services.blik_application_service import BlikApplicationService
-from services.blik_stats.manager import BlikMetricsManager
 from services.exceptions import (
     ExternalServiceFailed,
     FileNotFound,
@@ -24,65 +23,13 @@ from services.exceptions import (
     MatchesNotComputed,
     TransactionNotFound,
 )
-from services.firefly_blik_service import FireflyBlikService
 from services.guards import require_active_user
-from settings import settings
 
 router = APIRouter(
     prefix="/api/blik_files",
     tags=["blik-files"],
-    dependencies=[Depends(require_active_user)],
 )
 logger = logging.getLogger(__name__)
-
-
-# --------------------------------------------------
-# Dependency
-# --------------------------------------------------
-
-
-@lru_cache(maxsize=1)
-def blik_service_singleton() -> BlikApplicationService:
-    if not settings.FIREFLY_URL or not settings.FIREFLY_TOKEN:
-        raise RuntimeError("Config error")
-
-    client = FireflyClient(
-        base_url=settings.FIREFLY_URL,
-        token=settings.FIREFLY_TOKEN,
-    )
-
-    blik_service = FireflyBlikService(
-        client,
-        settings.BLIK_DESCRIPTION_FILTER,
-    )
-
-    return BlikApplicationService(blik_service=blik_service)
-
-
-def blik_service_dep() -> BlikApplicationService:
-    return blik_service_singleton()
-
-
-@lru_cache(maxsize=1)
-def blik_metrics_manager_singleton() -> BlikMetricsManager:
-    if not settings.FIREFLY_URL or not settings.FIREFLY_TOKEN:
-        raise RuntimeError("Config error")
-
-    client = FireflyClient(
-        base_url=settings.FIREFLY_URL,
-        token=settings.FIREFLY_TOKEN,
-    )
-
-    blik_service = FireflyBlikService(
-        client,
-        settings.BLIK_DESCRIPTION_FILTER,
-    )
-
-    return BlikMetricsManager(blik_service=blik_service)
-
-
-def blik_metrics_manager_dep() -> BlikMetricsManager:
-    return blik_metrics_manager_singleton()
 
 
 # --------------------------------------------------
@@ -96,7 +43,8 @@ def blik_metrics_manager_dep() -> BlikMetricsManager:
     deprecated=True,
 )
 async def get_statistics(
-    svc: BlikApplicationService = Depends(blik_service_dep),
+    user_id: UUID = Depends(require_active_user),
+    svc: BlikApplicationService = Depends(get_blik_application_runtime),
 ):
     try:
         return await svc.get_statistics()
@@ -110,7 +58,8 @@ async def get_statistics(
     deprecated=True,
 )
 async def refresh_statistics(
-    svc: BlikApplicationService = Depends(blik_service_dep),
+    user_id: UUID = Depends(require_active_user),
+    svc: BlikApplicationService = Depends(get_blik_application_runtime),
 ):
     try:
         return await svc.get_statistics(refresh=True)
@@ -123,9 +72,10 @@ async def refresh_statistics(
     response_model=BlikMetricsStatusResponse,
 )
 async def get_statistics_current(
-    manager: BlikMetricsManager = Depends(blik_metrics_manager_dep),
+    user_id: UUID = Depends(require_active_user),
+    svc: BlikApplicationService = Depends(get_blik_application_runtime),
 ):
-    state = manager.get_state()
+    state = svc.get_metrics_state()
     return map_blik_metrics_state_to_response(state)
 
 
@@ -134,9 +84,10 @@ async def get_statistics_current(
     response_model=BlikMetricsStatusResponse,
 )
 async def refresh_statistics_current(
-    manager: BlikMetricsManager = Depends(blik_metrics_manager_dep),
+    user_id: UUID = Depends(require_active_user),
+    svc: BlikApplicationService = Depends(get_blik_application_runtime),
 ):
-    state = await manager.refresh()
+    state = await svc.refresh_metrics_state()
     return map_blik_metrics_state_to_response(state)
 
 
@@ -146,7 +97,8 @@ async def refresh_statistics_current(
 )
 async def upload_csv(
     file: UploadFile = File(...),
-    svc: BlikApplicationService = Depends(blik_service_dep),
+    user_id: UUID = Depends(require_active_user),
+    svc: BlikApplicationService = Depends(get_blik_application_runtime),
 ):
     content = await file.read()
     return await svc.upload_csv(file_bytes=content)
@@ -158,7 +110,8 @@ async def upload_csv(
 )
 async def preview_csv(
     encoded_id: str,
-    svc: BlikApplicationService = Depends(blik_service_dep),
+    user_id: UUID = Depends(require_active_user),
+    svc: BlikApplicationService = Depends(get_blik_application_runtime),
 ):
     try:
         return await svc.preview_csv(encoded_id=encoded_id)
@@ -174,7 +127,8 @@ async def preview_csv(
 )
 async def preview_matches(
     encoded_id: str,
-    svc: BlikApplicationService = Depends(blik_service_dep),
+    user_id: UUID = Depends(require_active_user),
+    svc: BlikApplicationService = Depends(get_blik_application_runtime),
 ):
     try:
         return await svc.preview_matches(encoded_id=encoded_id)
@@ -193,7 +147,8 @@ async def preview_matches(
 async def apply_matches(
     encoded_id: str,
     payload: ApplyPayload,
-    svc: BlikApplicationService = Depends(blik_service_dep),
+    user_id: UUID = Depends(require_active_user),
+    svc: BlikApplicationService = Depends(get_blik_application_runtime),
 ):
     try:
         return await svc.apply_matches(encoded_id=encoded_id, payload=payload)

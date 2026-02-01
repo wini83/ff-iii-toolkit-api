@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
@@ -21,12 +20,12 @@ from services.guards import require_superuser
 router = APIRouter(
     prefix="/api/users",
     tags=["users"],
-    dependencies=[Depends(require_superuser)],
 )
 
 
 @router.get("", response_model=list[UserResponse])
 def list_users(
+    admin_id: UUID = Depends(require_superuser),
     db: Session = Depends(get_db),
 ):
     repo = UserRepository(db)
@@ -41,7 +40,7 @@ def list_users(
 )
 def create_user(
     payload: UserCreateRequest,
-    admin_id: Annotated[UUID, Depends(require_superuser)],
+    admin_id: UUID = Depends(require_superuser),
     db: Session = Depends(get_db),
 ):
     repo = UserRepository(db)
@@ -62,7 +61,7 @@ def create_user(
 )
 def disable_user(
     user_id: UUID,
-    admin_id: Annotated[UUID, Depends(require_superuser)],
+    admin_id: UUID = Depends(require_superuser),
     db: Session = Depends(get_db),
 ):
     repo = UserRepository(db)
@@ -78,7 +77,7 @@ def disable_user(
 )
 def enable_user(
     user_id: UUID,
-    admin_id: Annotated[UUID, Depends(require_superuser)],
+    admin_id: UUID = Depends(require_superuser),
     db: Session = Depends(get_db),
 ):
     repo = UserRepository(db)
@@ -94,7 +93,7 @@ def enable_user(
 )
 def promote_user(
     user_id: UUID,
-    admin_id: Annotated[UUID, Depends(require_superuser)],
+    admin_id: UUID = Depends(require_superuser),
     db: Session = Depends(get_db),
 ):
     repo = UserRepository(db)
@@ -109,7 +108,7 @@ def promote_user(
 )
 def demote_user(
     user_id: UUID,
-    admin_id: Annotated[UUID, Depends(require_superuser)],
+    admin_id: UUID = Depends(require_superuser),
     db: Session = Depends(get_db),
 ):
     repo = UserRepository(db)
@@ -124,7 +123,7 @@ def demote_user(
 )
 def delete_user(
     user_id: UUID,
-    admin_id: Annotated[UUID, Depends(require_superuser)],
+    admin_id: UUID = Depends(require_superuser),
     db: Session = Depends(get_db),
 ):
     repo = UserRepository(db)
@@ -135,6 +134,7 @@ def delete_user(
 
 @router.get("/audit-log", response_model=AuditLogResponse)
 def list_audit_log(
+    admin_id: UUID = Depends(require_superuser),
     actor_id: UUID | None = None,
     target_id: UUID | None = None,
     action: str | None = None,

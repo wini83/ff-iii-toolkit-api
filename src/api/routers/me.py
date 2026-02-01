@@ -1,4 +1,3 @@
-from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -17,8 +16,8 @@ router = APIRouter(
 
 @router.get("", response_model=MeResponse)
 def get_me(
-    user_id: Annotated[UUID, Depends(require_active_user)],
-    db: Annotated[Session, Depends(get_db)],
+    user_id: UUID = Depends(require_active_user),
+    db: Session = Depends(get_db),
 ):
     repo = UserRepository(db)
 

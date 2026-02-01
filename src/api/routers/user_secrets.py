@@ -2,7 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from api.deps_user_secrets import get_user_secrets_service
+from api.deps_services import get_user_secrets_service
 from api.models.user_secrets import CreateSecretPayload, UserSecretResponse
 from services.guards import require_active_user
 from services.user_secrets_service import UserSecretsService
@@ -10,7 +10,6 @@ from services.user_secrets_service import UserSecretsService
 router = APIRouter(
     prefix="/api/user-secrets",
     tags=["user-secrets"],
-    dependencies=[Depends(require_active_user)],
 )
 
 

@@ -3,6 +3,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from api.deps_db import get_db
+from api.deps_services import get_bootstrap_service
 from api.models.system import (
     BootstrapPayload,
     BootstrapResponse,
@@ -10,18 +11,9 @@ from api.models.system import (
     VersionResponse,
 )
 from services.db.passwords import hash_password
-from services.db.repository import UserRepository
 from services.system.bootstrap import BootstrapAlreadyDone, BootstrapService
 
 router = APIRouter(prefix="/api/system", tags=["system"])
-
-
-def get_bootstrap_service(
-    db: Session = Depends(get_db),
-) -> BootstrapService:
-    return BootstrapService(
-        user_repo=UserRepository(db),
-    )
 
 
 @router.get("/health", response_model=HealthResponse)
