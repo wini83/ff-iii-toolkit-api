@@ -1,9 +1,11 @@
 # services/users/repository.py
+from datetime import UTC, datetime
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from services.db.models import AuditLogORM, UserORM
+from services.db.models import AuditLogORM, SecretType, UserORM, UserSecretORM
 from services.domain.user import User
 
 
@@ -112,3 +114,51 @@ class AuditLogRepository:
         )
         self.db.add(row)
         self.db.commit()
+
+
+class UserSecretRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def create(
+        self,
+        *,
+        user_id: UUID,
+        type: SecretType,
+        secret: str,
+    ) -> UserSecretORM:
+        obj = UserSecretORM(
+            user_id=user_id,
+            type=type.value if hasattr(type, "value") else type,
+            secret=secret,
+        )
+        self.db.add(obj)
+        self.db.flush()
+        return obj
+
+    def get_by_id(self, secret_id: UUID) -> UserSecretORM | None:
+        return self.db.get(UserSecretORM, secret_id)
+
+    def get_for_user(
+        self,
+        *,
+        user_id: UUID,
+        type: SecretType | None = None,
+    ) -> list[UserSecretORM]:
+        stmt = select(UserSecretORM).where(UserSecretORM.user_id == user_id)
+        if type:
+            stmt = stmt.where(
+                UserSecretORM.type == (type.value if hasattr(type, "value") else type)
+            )
+        return list(self.db.scalars(stmt))
+
+    def mark_used(self, *, secret: UserSecretORM, meta: dict | None = None) -> None:
+        secret.usage_count += 1
+        secret.last_used_at = datetime.now(UTC)
+        if meta is not None:
+            secret.last_used_meta = meta
+        self.db.flush()
+
+    def delete(self, *, secret: UserSecretORM) -> None:
+        self.db.delete(secret)
+        self.db.flush()
