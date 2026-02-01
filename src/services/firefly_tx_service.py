@@ -1,7 +1,8 @@
-from datetime import date
+from datetime import UTC, date, datetime
 
 from ff_iii_luciferin.api import FireflyAPIError, FireflyClient
 
+from services.domain.metrics import TXStatisticsMetrics
 from services.domain.transaction import (
     Category,
     Transaction,
@@ -12,8 +13,10 @@ from services.firefly_base_service import (
     FireflyBaseService,
     FireflyServiceError,
     filter_by_description,
+    filter_out_categorized,
 )
 from services.mappers.firefly import category_from_ff_category, tx_from_ff_tx
+from services.tx_stats.helpers import group_tx_by_month
 
 
 class FireflyTxService(FireflyBaseService):
@@ -85,3 +88,32 @@ class FireflyTxService(FireflyBaseService):
     async def add_tag_by_id(self, tx_id: int, tag: str) -> None:
         tx = await self.get_transaction(tx_id)
         await self.add_tag(tx=tx, tag=tag)
+
+    async def fetch_metrics(self):
+        domain_txs, metrics = await self.fetch_transactions_with_metrics()
+        txs_uncategorized = filter_out_categorized(domain_txs)
+        txs_blik_ok = filter_by_description(
+            txs_uncategorized, self.filter_desc_blik, exact_match=True, exclude=True
+        )
+        txs_action_not_req = [t for t in txs_blik_ok if TxTag.action_req not in t.tags]
+        txs_allegro_ok = [
+            t
+            for t in txs_action_not_req
+            if not (
+                self.filter_desc_allegro in t.description.lower()
+                and TxTag.allegro_done not in t.tags
+            )
+        ]
+        categorizable_by_month = await group_tx_by_month(txs_allegro_ok)
+        return TXStatisticsMetrics(
+            total_transactions=metrics.total_transactions,
+            single_part_transactions=len(domain_txs),
+            uncategorized_transactions=len(txs_uncategorized),
+            blik_not_ok=len(txs_uncategorized) - len(txs_blik_ok),
+            action_req=len(txs_blik_ok) - len(txs_action_not_req),
+            allegro_not_ok=len(txs_action_not_req) - len(txs_allegro_ok),
+            categorizable=len(txs_allegro_ok),
+            categorizable_by_month=categorizable_by_month,
+            time_stamp=datetime.now(UTC),
+            fetching_duration_ms=metrics.fetching_duration_ms,
+        )

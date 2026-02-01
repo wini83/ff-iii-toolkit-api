@@ -1,14 +1,20 @@
+import asyncio
 import calendar
 from datetime import date
+from typing import cast
 
 from api.mappers.tx import map_category_to_api, map_tx_to_api
 from api.models.tx import (
     ScreeningMonthResponse,
     TxTag,
 )
+from api.models.tx_stats import TxMetricsResultResponse, TxMetricsStatusResponse
+from services.domain.metrics import TXStatisticsMetrics
 from services.exceptions import ExternalServiceFailed
 from services.firefly_base_service import FireflyServiceError
 from services.firefly_tx_service import FireflyTxService
+from services.tx_stats.registry import TxStatsJobRegistry
+from services.tx_stats.runner import run_tx_stats_job
 
 
 class TxApplicationService:
@@ -22,6 +28,7 @@ class TxApplicationService:
 
     def __init__(self, *, tx_service: FireflyTxService) -> None:
         self.tx_service = tx_service
+        self.tx_stats_registry = TxStatsJobRegistry()
 
     # --------------------------------------------------
     # SCREENING
@@ -67,6 +74,47 @@ class TxApplicationService:
             await self.tx_service.add_tag_by_id(tx_id=tx_id, tag=tag.value)
         except FireflyServiceError as e:
             raise ExternalServiceFailed(str(e)) from e
+
+    # --------------------------------------------------
+    # METRICS
+    # --------------------------------------------------
+
+    async def run_tx_metrics(self) -> str:
+        """
+        Start async transaction statistics computation.
+        Returns job_id.
+        """
+        job = self.tx_stats_registry.create()
+        asyncio.create_task(run_tx_stats_job(job, self.tx_service))
+        return job.job_id
+
+    def get_tx_metrics_status(self, *, job_id: str) -> TxMetricsStatusResponse | None:
+        """
+        Get current status (and result if finished) of stats job.
+        """
+        job = self.tx_stats_registry.get(job_id)
+        if job is None:
+            return None
+        result = None
+        if job.result:
+            result = cast(TXStatisticsMetrics, job.result)
+            result = TxMetricsResultResponse(
+                single_part_transactions=result.single_part_transactions,
+                uncategorized_transactions=result.uncategorized_transactions,
+                blik_not_ok=result.blik_not_ok,
+                action_req=result.action_req,
+                allegro_not_ok=result.allegro_not_ok,
+                categorizable=result.categorizable,
+                categorizable_by_month=result.categorizable_by_month,
+                time_stamp=result.time_stamp,
+            )
+
+        return TxMetricsStatusResponse(
+            status=job.status.value,
+            progress=job.progress,
+            result=result,
+            error=job.error,
+        )
 
     # --------------------------------------------------
     # INTERNAL HELPERS

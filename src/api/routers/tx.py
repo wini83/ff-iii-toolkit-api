@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from ff_iii_luciferin.api import FireflyClient
 
 from api.models.tx import ScreeningMonthResponse, TxTag
+from api.models.tx_stats import RunResponse, TxMetricsStatusResponse
 from services.exceptions import ExternalServiceFailed
 from services.firefly_tx_service import FireflyTxService
 from services.guards import require_active_user
@@ -102,3 +103,34 @@ async def apply_tag(
         await svc.apply_tag(tx_id=tx_id, tag=tag)
     except ExternalServiceFailed as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
+
+
+@router.post(
+    "/stats",
+    response_model=RunResponse,
+    status_code=202,
+)
+async def run_tx_stats(
+    svc: TxApplicationService = Depends(tx_service_dep),
+):
+    try:
+        job_id = await svc.run_tx_metrics()
+    except ExternalServiceFailed as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+    return RunResponse(job_id=job_id)
+
+
+@router.get(
+    "/stats/{job_id}",
+    response_model=TxMetricsStatusResponse,
+)
+def get_tx_stats_status(
+    job_id: str,
+    svc: TxApplicationService = Depends(tx_service_dep),
+):
+    job = svc.get_tx_metrics_status(job_id=job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Metrics job not found")
+
+    return job

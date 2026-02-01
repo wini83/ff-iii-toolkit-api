@@ -188,7 +188,7 @@ class BlikApplicationService:
         async with self._stats_lock:
             if self._stats_cache is None or refresh:
                 try:
-                    domain_metrics = await self.blik_service.fetch_blik_metrics()
+                    domain_metrics = await self.blik_service.fetch_metrics()
                 except FireflyServiceError as e:
                     raise ExternalServiceFailed(str(e)) from e
                 self._stats_cache = map_blik_metrics_to_api(domain_metrics)
