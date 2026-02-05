@@ -1,14 +1,18 @@
 # services/user_secrets_service.py
 from uuid import UUID
 
-from api.models.user_secrets import SecretTypeAPI
-from services.db.models import SecretType, UserSecretORM
+from services.db.models import UserSecretORM
 from services.db.repository import AuditLogRepository, UserSecretRepository
-
-SECRET_TYPE_MAP: dict[SecretTypeAPI, SecretType] = {
-    SecretTypeAPI.ALLEGRO: SecretType.ALLEGRO,
-    SecretTypeAPI.AMAZON: SecretType.AMAZON,
-}
+from services.domain.user_secrets import (
+    SecretType,
+    UserSecretModel,
+    UserSecretReadModel,
+)
+from services.mappers.user_secrets import (
+    map_secret_to_domain_model,
+    map_secret_to_domain_read_model,
+    map_secrets_to_domain_read_models,
+)
 
 
 class UserSecretsService:
@@ -25,15 +29,6 @@ class UserSecretsService:
     # Internal helpers (policy layer)
     # -------------------------------------------------
 
-    def _map_type_api_to_db(self, api_type: SecretTypeAPI) -> SecretType:
-        """
-        Jedyna dozwolona translacja API -> DB.
-        """
-        try:
-            return SecretType(api_type.value)
-        except ValueError:
-            raise ValueError(f"Unsupported secret type: {api_type}") from None
-
     def _assert_ownership(self, *, secret: UserSecretORM, user_id: UUID) -> None:
         if secret.user_id != user_id:
             raise ValueError("Secret not found")
@@ -47,14 +42,12 @@ class UserSecretsService:
         *,
         actor_id: UUID,
         user_id: UUID,
-        type: SecretTypeAPI,
+        type: SecretType,
         secret: str,
-    ) -> UserSecretORM:
-        db_type = self._map_type_api_to_db(type)
-
+    ) -> UserSecretReadModel:
         obj = self.secret_repo.create(
             user_id=user_id,
-            type=db_type,
+            type=type,
             secret=secret,
         )
 
@@ -62,10 +55,10 @@ class UserSecretsService:
             actor_id=actor_id,
             action="user_secret.create",
             target_id=obj.id,
-            metadata={"type": db_type.value},
+            metadata={"type": type.value},
         )
 
-        return obj
+        return map_secret_to_domain_read_model(obj=obj)
 
     def delete(
         self,
@@ -92,23 +85,14 @@ class UserSecretsService:
     # Queries (SAFE)
     # -------------------------------------------------
 
-    def list_for_user(self, *, user_id: UUID) -> list[dict]:
+    def list_for_user(self, *, user_id: UUID) -> list[UserSecretReadModel]:
         """
         Query model SAFE BY DESIGN.
         Nigdy nie zwraca `secret`.
         """
         secrets = self.secret_repo.get_for_user(user_id=user_id)
 
-        return [
-            {
-                "id": s.id,
-                "type": s.type,
-                "usage_count": s.usage_count,
-                "last_used_at": s.last_used_at,
-                "created_at": s.created_at,
-            }
-            for s in secrets
-        ]
+        return map_secrets_to_domain_read_models(objs=secrets)
 
     # -------------------------------------------------
     # Internal usage (non-API)
@@ -119,7 +103,7 @@ class UserSecretsService:
         *,
         secret_id: UUID,
         usage_meta: dict | None = None,
-    ) -> UserSecretORM:
+    ) -> UserSecretModel:
         """
         Jedyna metoda, która zwraca `secret`.
         NIE dla routerów.
@@ -140,4 +124,4 @@ class UserSecretsService:
             metadata=usage_meta,
         )
 
-        return secret
+        return map_secret_to_domain_model(obj=secret)

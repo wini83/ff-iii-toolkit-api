@@ -53,7 +53,12 @@ class AllegroApiClient:
             f"{ALLEGRO_API_URL}/users",
             headers=headers,
         )
-        return GetUserInfoResult(get_orders_response)
+        try:
+            return GetUserInfoResult(get_orders_response)
+        except ValueError:
+            raise AllegroApiError(
+                "Failed to parse Allegro user info response"
+            ) from None
 
 
 class ApiWrapper:

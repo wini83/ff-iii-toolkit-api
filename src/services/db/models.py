@@ -1,11 +1,12 @@
 # services/db/models.py
 import uuid
 from datetime import UTC, datetime
-from enum import Enum
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
+
+from services.domain.user_secrets import SecretType
 
 from .types import GUID
 
@@ -84,13 +85,6 @@ class AuditLogORM(Base):
         default=lambda: datetime.now(UTC),
         nullable=False,
     )
-
-
-class SecretType(str, Enum):
-    ALLEGRO = "allegro"
-    AMAZON = "amazon"
-    SESSION = "session"
-    API_TOKEN = "api_token"
 
 
 class UserSecretORM(Base):

@@ -1,23 +1,19 @@
 from datetime import datetime
-from enum import Enum
 from uuid import UUID
 
 from pydantic import BaseModel
 
-
-class SecretTypeAPI(str, Enum):
-    ALLEGRO = "allegro"
-    AMAZON = "amazon"
+from services.domain.user_secrets import SecretType
 
 
 class CreateSecretPayload(BaseModel):
-    type: SecretTypeAPI
+    type: SecretType
     secret: str
 
 
 class UserSecretResponse(BaseModel):
     id: UUID
-    type: str
+    type: SecretType
     usage_count: int
     last_used_at: datetime | None
     created_at: datetime
