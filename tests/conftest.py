@@ -1,18 +1,27 @@
 import os
 
 os.environ.setdefault("SECRET_KEY", "test-secret")
+from pathlib import Path
+
 import pytest
+from alembic.config import Config
 from fastapi import Request
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from alembic import command
 from api.deps_db import get_db
 from main import create_app  # 👈 TO JEST KLUCZ
-from services.db.models import Base
 
 os.environ.setdefault("SECRET_KEY", "test-secret")
+
+
+def _run_migrations(connection) -> None:
+    alembic_cfg = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+    alembic_cfg.attributes["connection"] = connection
+    command.upgrade(alembic_cfg, "head")
 
 
 @pytest.fixture(scope="function")
@@ -22,15 +31,19 @@ def db():
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
-    TestingSessionLocal = sessionmaker(bind=engine)
-
-    Base.metadata.create_all(engine)
+    connection = engine.connect()
+    _run_migrations(connection)
+    TestingSessionLocal = sessionmaker(
+        bind=connection, autocommit=False, autoflush=False
+    )
 
     session = TestingSessionLocal()
     try:
         yield session
     finally:
         session.close()
+        connection.close()
+        engine.dispose()
 
 
 @pytest.fixture(scope="function")

@@ -21,6 +21,7 @@ dependencies = [
  "sqlalchemy>=2.0.45",
  "passlib[bcrypt]>=1.7.4",
  "argon2-cffi>=25.1.0",
+ "alembic>=1.18.3",
 ]
 
 
@@ -64,6 +65,12 @@ addopts = "-ra"
 target-version = "py312"
 line-length = 88
 fix = true
+exclude = [
+  ".venv",
+  "venv",
+  "alembic/versions",
+]
+
 
 [tool.ruff.lint]
 select = [
@@ -102,3 +109,12 @@ omit = [
 show_missing = true
 skip_empty = true
 fail_under = 70
+
+[tool.black]
+exclude = '''
+/(
+    \.venv
+  | venv
+  | alembic/versions
+)/
+'''

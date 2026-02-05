@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from api.routers.auth import create_refresh_token
+from api.routers.auth import create_access_token, create_refresh_token
 from services.db.passwords import hash_password
 from services.db.repository import UserRepository
 from settings import settings
@@ -38,3 +38,43 @@ def test_auth_refresh_happy_path(client):
     body = response.json()
     assert "access_token" in body
     assert body["token_type"] == "bearer"
+
+
+def test_auth_token_rejects_unknown_user(client):
+    response = client.post(
+        "/api/auth/token",
+        data={"username": "missing", "password": "pass"},
+    )
+
+    assert response.status_code == 401
+
+
+def test_auth_token_rejects_invalid_password(client, db):
+    repo = UserRepository(db)
+    repo.create(
+        username="user",
+        password_hash=hash_password("pass"),
+        is_superuser=False,
+    )
+
+    response = client.post(
+        "/api/auth/token",
+        data={"username": "user", "password": "bad"},
+    )
+
+    assert response.status_code == 401
+
+
+def test_auth_refresh_rejects_missing_cookie(client):
+    response = client.post("/api/auth/refresh")
+
+    assert response.status_code == 401
+
+
+def test_auth_refresh_rejects_access_token(client):
+    token = create_access_token(str(uuid4()))
+    client.cookies.set(settings.REFRESH_COOKIE_NAME, token)
+
+    response = client.post("/api/auth/refresh")
+
+    assert response.status_code == 401

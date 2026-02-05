@@ -136,7 +136,7 @@ def test_get_blik_metrics_aggregates_counts_and_months():
     )
     service.fetch_transactions_with_metrics.return_value = (txs, metrics)
 
-    stats = asyncio.run(service.fetch_blik_metrics())
+    stats = asyncio.run(service.fetch_metrics())
 
     assert stats.total_transactions == 50
     assert stats.single_part_transactions == 5

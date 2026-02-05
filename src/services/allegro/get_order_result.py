@@ -134,6 +134,13 @@ class Payment:
         return self.orders[0].payment_amount
 
     @property
+    def date(self) -> datetime:
+        """Return payment date."""
+        if not self.orders:
+            raise ValueError("No orders in payment")
+        return self.orders[0].order_date
+
+    @property
     def is_balanced(self) -> bool:
         """Czy suma wartości zamówień zgadza się z kwotą płatności (z tolerancją)."""
         return abs(self.amount - self.sum_total_cost) <= self.tolerance

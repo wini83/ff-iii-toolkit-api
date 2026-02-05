@@ -1,44 +1,15 @@
 from datetime import UTC, datetime
 
-import pandas as pd
-from anyio import to_thread
 from ff_iii_luciferin.api import FireflyClient
 
 from services.domain.metrics import BlikStatisticsMetrics
-from services.domain.transaction import Transaction, TxTag
+from services.domain.transaction import TxTag
 from services.firefly_base_service import (
     filter_by_description,
     filter_out_categorized,
 )
 from services.firefly_enrichment_service import FireflyEnrichmentService
-
-
-def txs_to_df(txs: list[Transaction]) -> pd.DataFrame:
-    return pd.DataFrame(
-        {
-            "date": tx.date,
-            "tags": tx.tags,
-        }
-        for tx in txs
-    )
-
-
-def _group_tx_by_month_sync(txs: list[Transaction]) -> dict[str, int]:
-    if not txs:
-        return {}
-    df = txs_to_df(txs)
-
-    # YYYY-MM z daty
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
-    df["month"] = df["date"].dt.to_period("M").astype(str)  # type: ignore[attr-defined]
-
-    return df.groupby("month").size().sort_index().to_dict()
-
-
-async def group_tx_by_month(
-    txs: list[Transaction],
-) -> dict[str, int]:
-    return await to_thread.run_sync(_group_tx_by_month_sync, txs)
+from services.tx_stats.helpers import group_tx_by_month
 
 
 class FireflyBlikService(FireflyEnrichmentService):
@@ -48,7 +19,7 @@ class FireflyBlikService(FireflyEnrichmentService):
         super().__init__(firefly_client)
         self.filter_desc_blik = filter_desc_blik
 
-    async def fetch_blik_metrics(self) -> BlikStatisticsMetrics:
+    async def fetch_metrics(self) -> BlikStatisticsMetrics:
         domain_txs, metrics = await self.fetch_transactions_with_metrics()
         uncategorized = filter_out_categorized(domain_txs)
         filtered_by_desc_exact = filter_by_description(

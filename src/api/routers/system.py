@@ -1,39 +1,64 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from api.deps_db import get_db
-from api.models.system import BootstrapPayload, HealthResponse, VersionResponse
+from api.deps_services import get_bootstrap_service
+from api.models.system import (
+    BootstrapPayload,
+    BootstrapResponse,
+    HealthResponse,
+    VersionResponse,
+)
 from services.db.passwords import hash_password
-from services.db.repository import UserRepository
 from services.system.bootstrap import BootstrapAlreadyDone, BootstrapService
 
 router = APIRouter(prefix="/api/system", tags=["system"])
 
-APP_VERSION: str | None = None
-
-
-def init_system_router(version: str):
-    """Call this function from main to inject version."""
-    global APP_VERSION
-    APP_VERSION = version
-
 
 @router.get("/health", response_model=HealthResponse)
-async def health_check():
-    return HealthResponse()
+async def health_check(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    db_service: BootstrapService = Depends(get_bootstrap_service),
+):
+    db_status = "ok"
+    overall_status = "ok"
+    # --- DB check ---
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception:
+        db_status = "error"
+        overall_status = "error"
+    if overall_status == "error":
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+
+    bootstrapped = db_service.is_bootstrapped()
+
+    return HealthResponse(
+        status=overall_status, database=db_status, bootstrapped=bootstrapped
+    )
 
 
 @router.get("/version", response_model=VersionResponse)
-async def version_check():
-    return VersionResponse(version=APP_VERSION or "unknown")
+async def version_check(request: Request):
+    version = getattr(request.app.state, "version", "unknown")
+    return VersionResponse(version=version)
+
+
+@router.get("/bootstrap/status", response_model=BootstrapResponse)
+def bootstrap_status(
+    service: BootstrapService = Depends(get_bootstrap_service),
+):
+    return BootstrapResponse(bootstrapped=service.is_bootstrapped())
 
 
 @router.post("/bootstrap", status_code=201)
 def bootstrap_system(
     payload: BootstrapPayload,
-    db: Session = Depends(get_db),
+    service: BootstrapService = Depends(get_bootstrap_service),
 ):
-    service = BootstrapService(UserRepository(db))
     try:
         service.bootstrap_superuser(
             username=payload.username,

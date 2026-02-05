@@ -16,7 +16,7 @@ def main() -> None:
 
     print("▶ Fetching user info...")
     user = client.get_user_info()
-    pprint(user.as_dict())  # albo user.login, zależnie od struktury
+    pprint(user.login)  # albo user.login, zależnie od struktury
 
     print("\n▶ Fetching orders...")
     orders_result = client.get_orders()

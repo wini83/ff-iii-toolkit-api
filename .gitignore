@@ -139,3 +139,5 @@ data-legacy/
 coverage.xml
 htmlcov/
 data/app.db
+
+*.patch

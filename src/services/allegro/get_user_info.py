@@ -8,10 +8,13 @@ class GetUserInfoResult:
 
     def __init__(self, items: dict[str, Any]) -> None:
         """Init method"""
-        self._login: str = items["accounts"]["allegro"]["login"]
+        try:
+            self._login: str = items["accounts"]["allegro"]["login"]
+        except KeyError as exc:
+            raise ValueError("invalid allegro user info response structure") from exc
 
     @property
-    def get_login(self) -> str:
+    def login(self) -> str:
         """Return user's login."""
         return self._login
 

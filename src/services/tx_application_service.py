@@ -6,9 +6,12 @@ from api.models.tx import (
     ScreeningMonthResponse,
     TxTag,
 )
+from services.domain.metrics import TXStatisticsMetrics
 from services.exceptions import ExternalServiceFailed
 from services.firefly_base_service import FireflyServiceError
 from services.firefly_tx_service import FireflyTxService
+from services.tx_stats.manager import TxMetricsManager
+from services.tx_stats.models import MetricsState
 
 
 class TxApplicationService:
@@ -22,6 +25,7 @@ class TxApplicationService:
 
     def __init__(self, *, tx_service: FireflyTxService) -> None:
         self.tx_service = tx_service
+        self.tx_metrics_manager = TxMetricsManager(tx_service=tx_service)
 
     # --------------------------------------------------
     # SCREENING
@@ -67,6 +71,18 @@ class TxApplicationService:
             await self.tx_service.add_tag_by_id(tx_id=tx_id, tag=tag.value)
         except FireflyServiceError as e:
             raise ExternalServiceFailed(str(e)) from e
+
+    # --------------------------------------------------
+    # METRICS
+    # --------------------------------------------------
+
+    async def get_tx_metrics(self) -> MetricsState[TXStatisticsMetrics]:
+        state = self.tx_metrics_manager.get_state()
+        return state
+
+    async def refresh_tx_metrics(self) -> MetricsState[TXStatisticsMetrics]:
+        state = await self.tx_metrics_manager.refresh()
+        return state
 
     # --------------------------------------------------
     # INTERNAL HELPERS
