@@ -128,6 +128,33 @@
 - **api**: - extract upload and file endpoints into separate routers - move csv parsing and transaction processing to services/ - add centralized logging and encoding utilities - introduce config module for env settings - create clean app entrypoint with router registration - improve project structure for scalability and maintainability
 - **all**: black isort ruff
 
+## v2.5.0 (2026-02-05)
+
+### Feat
+
+- **allegro**: add metrics endpoints and Firefly-backed stats service
+- **user-secrets**: introduce secure user secrets management with audit trail
+- **blik**: add snapshot-based BLIK statistics API alongside legacy endpoints
+- **tx**: add tx stats
+- **users**: add admin audit log endpoint and tests
+- **users**: add enable, demote, and delete user actions with audit logs
+- **db**: add alembic setup and initial migration
+- **users**: add audit log for admin actions and adapt tests
+- **api**: enrich simplified tx with currency, type, and fx fields
+- add currency/fx context and tx type to Transaction, bump luciferin
+
+### Refactor
+
+- **api**: add metrics fetch duration and router-level auth deps
+- **allegro**: add domain models and service layer with improved error handling
+- **api**: add metrics fetch duration and router-level auth deps
+- **api**: centralize Firefly dependencies and runtime services
+- **tx**: switch to snapshot-based async metrics with generic runner
+- **system**: addded bootstrap status to health endpoint
+- **system**: enhanced boostrap and health endpoints
+- **system**: move app version to app.state and remove router init side effects
+- **db**: migration to alembic
+
 ## v2.4.0 (2026-02-01)
 
 ## v2.4.0b0 (2026-01-25)
