@@ -27,6 +27,14 @@ class BlikStatisticsMetrics(BaseMetrics):
 
 
 @dataclass
+class AllegroMetrics(BaseMetrics):
+    allegro_transactions: int
+    not_processed_allegro_transactions: int
+    not_processed_by_month: dict[str, int]
+    time_stamp: datetime
+
+
+@dataclass
 class TXStatisticsMetrics(BaseMetrics):
     single_part_transactions: int
     uncategorized_transactions: int

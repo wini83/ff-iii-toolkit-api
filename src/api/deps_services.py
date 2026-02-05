@@ -10,6 +10,7 @@ from services.db.repository import (
     UserRepository,
     UserSecretRepository,
 )
+from services.firefly_allegro_service import FireflyAllegroService
 from services.firefly_blik_service import FireflyBlikService
 from services.firefly_tx_service import FireflyTxService
 from services.system.bootstrap import BootstrapService
@@ -61,4 +62,12 @@ def get_bootstrap_service(
 ) -> BootstrapService:
     return BootstrapService(
         user_repo=UserRepository(db),
+    )
+
+
+def get_firefly_allegro_service() -> FireflyAllegroService:
+    client = get_firefly_client()
+    return FireflyAllegroService(
+        client,
+        getattr(settings, "ALLEGRO_DESCRIPTION_FILTER", "allegro"),
     )
