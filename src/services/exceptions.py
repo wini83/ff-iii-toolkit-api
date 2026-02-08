@@ -23,6 +23,10 @@ class TransactionNotFound(ApplicationError):
     pass
 
 
+class InvalidSecretId(ApplicationError):
+    pass
+
+
 # ---- 5xx ----
 class ExternalServiceFailed(ApplicationError):
     pass

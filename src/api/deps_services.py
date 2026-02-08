@@ -5,6 +5,7 @@ from ff_iii_luciferin.api import FireflyClient
 from sqlalchemy.orm import Session
 
 from api.deps_db import get_db
+from services.allegro_service import AllegroService, allegro_client_factory
 from services.db.repository import (
     AuditLogRepository,
     UserRepository,
@@ -71,3 +72,7 @@ def get_firefly_allegro_service() -> FireflyAllegroService:
         client,
         getattr(settings, "ALLEGRO_DESCRIPTION_FILTER", "allegro"),
     )
+
+
+def get_allegro_service() -> AllegroService:
+    return AllegroService(client_factory=allegro_client_factory)

@@ -3,7 +3,7 @@ import os
 from typing import Any
 
 from dotenv import load_dotenv
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Load .env immediately
@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     allowed_origins: Any = ["*"]
     DEMO_MODE: bool = False
 
-    SECRET_KEY: str
+    SECRET_KEY: str = Field(..., env="SECRET_KEY")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     BLIK_DESCRIPTION_FILTER: str = "BLIK - płatność w internecie"

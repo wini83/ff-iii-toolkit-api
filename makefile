@@ -16,3 +16,6 @@ pre:
 ruff:
 	uv run ruff check . --fix
 	uv run ruff format .
+
+mypy:
+	uv run env PYTHONPATH=src mypy .

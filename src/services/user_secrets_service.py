@@ -102,6 +102,7 @@ class UserSecretsService:
         self,
         *,
         secret_id: UUID,
+        user_id: UUID,
         usage_meta: dict | None = None,
     ) -> UserSecretModel:
         """
@@ -111,6 +112,8 @@ class UserSecretsService:
         secret = self.secret_repo.get_by_id(secret_id)
         if not secret:
             raise ValueError("Secret not found")
+
+        self._assert_ownership(secret=secret, user_id=user_id)
 
         self.secret_repo.mark_used(
             secret=secret,

@@ -28,6 +28,11 @@ COPY --from=builder /app/.venv ./.venv
 COPY --from=builder /app/src ./src
 COPY pyproject.toml ./
 
+COPY alembic ./alembic
+COPY alembic.ini ./alembic.ini
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # PATH → używamy venv jako głównego interpretera
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
@@ -41,5 +46,6 @@ EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:8000/api/system/health || exit 1
 
+ENTRYPOINT ["/entrypoint.sh"]
 # Produkcyjny entrypoint
 CMD ["uvicorn", "src.main:create_production_app", "--factory","--proxy-headers","--forwarded-allow-ips", "*","--host", "0.0.0.0", "--port", "8000"]
