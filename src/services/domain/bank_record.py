@@ -62,9 +62,9 @@ class BankRecord(BaseMatchItem, Evidence):
         notes = add_line(tx.notes, self.pretty_print(only_meaningful=True))
         tags = set(tx.tags)
         tags.add(TxTag.blik_done)
-        tags = list(tags)
+        tags_list = list(tags)
         return TransactionUpdate(
             description=new_description,
             notes=notes,
-            tags=tags,
+            tags=tags_list,
         )

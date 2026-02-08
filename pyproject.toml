@@ -45,6 +45,7 @@ dev = [
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
     "ruff>=0.14.5",
+    "types-requests>=2.32.4.20260107",
 ]
 
 [tool.deptry]
@@ -118,3 +119,12 @@ exclude = '''
   | alembic/versions
 )/
 '''
+[tool.mypy]
+python_version = "3.12"
+
+explicit_package_bases = true
+namespace_packages = true
+
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true

@@ -2,15 +2,21 @@
 
 from functools import lru_cache
 
+from fastapi import Depends
+
 from api.deps_services import (
+    get_allegro_service,
     get_firefly_allegro_service,
     get_firefly_blik_service,
     get_firefly_tx_service,
     get_user_secrets_service,
 )
 from services.allegro_application_service import AllegroApplicationService
+from services.allegro_service import AllegroService
 from services.blik_application_service import BlikApplicationService
+from services.firefly_allegro_service import FireflyAllegroService
 from services.tx_application_service import TxApplicationService
+from services.user_secrets_service import UserSecretsService
 
 
 @lru_cache(maxsize=1)
@@ -24,8 +30,13 @@ def get_tx_application_runtime() -> TxApplicationService:
 
 
 @lru_cache(maxsize=1)
-def get_allegro_application_runtime() -> AllegroApplicationService:
+def get_allegro_application_runtime(
+    secrets_service: UserSecretsService = Depends(get_user_secrets_service),
+    ff_allegro_service: FireflyAllegroService = Depends(get_firefly_allegro_service),
+    allegro_service: AllegroService = Depends(get_allegro_service),
+) -> AllegroApplicationService:
     return AllegroApplicationService(
-        secrets_service=get_user_secrets_service(),
-        ff_allegro_service=get_firefly_allegro_service(),
+        secrets_service=secrets_service,
+        ff_allegro_service=ff_allegro_service,
+        allegro_service=allegro_service,
     )

@@ -1,4 +1,4 @@
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from dataclasses import replace
 
 from requests import Session
@@ -20,58 +20,63 @@ class AllegroServiceError(RuntimeError):
 
 
 class AllegroService:
-    def __init__(self, client_factory: Callable[[str], AllegroApiClient]) -> None:
+    def __init__(
+        self,
+        client_factory: Callable[[str], AllegroApiClient],
+    ) -> None:
         self._client_factory = client_factory
 
-    # --------------------------------------------------
-    # Account enrichment
-    # --------------------------------------------------
+    def _client_for(self, account: AllegroAccount) -> AllegroApiClient:
+        client = self._client_factory(account.secret)
 
-    def enrich_accounts(
-        self,
-        accounts: Iterable[AllegroAccount],
-    ) -> list[AllegroAccount]:
-        enriched: list[AllegroAccount] = []
+        return client
 
-        for account in accounts:
-            if account.login is not None:
-                enriched.append(account)
-                continue
+    def fetch(self, account: AllegroAccount) -> AllegroOrderPayments:
+        client = self._client_for(account)
 
-            client: AllegroApiClient = self._client_factory(account.secret)
-            try:
-                info = client.get_user_info()
-                enriched.append(replace(account, login=info.login))
-            except Exception as exc:
-                raise self._wrap_error(exc) from exc
-
-        return enriched
-
-    # --------------------------------------------------
-    # Payments
-    # --------------------------------------------------
-
-    def fetch_payments(
-        self,
-        accounts: Iterable[AllegroAccount],
-    ) -> AllegroOrderPayments:
-        all_payments: list[AllegroOrderPayment] = []
-
-        for account in accounts:
+        try:
             if account.login is None:
-                raise AllegroServiceError("account login is not yet enriched")
-            client: AllegroApiClient = self._client_factory(account.secret)
+                info = client.get_user_info()
+                account = replace(account, login=info.login)
+
+            raw = client.get_orders()
+            payments = [
+                AllegroOrderPayment.from_allegro_payment(p, account.login or "unknown")
+                for p in raw.payments
+            ]
+
+            return AllegroOrderPayments(payments=payments)
+
+        except Exception as exc:
+            raise self._wrap_error(exc) from exc
+
+    def batch_fetch(self, accounts: list[AllegroAccount]) -> AllegroOrderPayments:
+        payments: list[AllegroOrderPayment] = []
+        enriched_accounts: list[AllegroAccount] = []
+
+        for account in accounts:
+            client = self._client_for(account)
+
             try:
-                raw_payment = client.get_orders()
+                if account.login is None:
+                    info = client.get_user_info()
+                    account = replace(account, login=info.login)
+
+                enriched_accounts.append(account)
+
+                raw = client.get_orders()
+                payments.extend(
+                    AllegroOrderPayment.from_allegro_payment(
+                        p, account.login or "unknown"
+                    )
+                    for p in raw.payments
+                )
+
             except Exception as exc:
                 raise self._wrap_error(exc) from exc
 
-            all_payments.extend(
-                AllegroOrderPayment.from_allegro_payment(payment, account.login)
-                for payment in raw_payment.payments
-            )
-
-        return AllegroOrderPayments(payments=all_payments)
+        self._accounts = enriched_accounts
+        return AllegroOrderPayments(payments=payments)
 
     # --------------------------------------------------
     # Error mapping

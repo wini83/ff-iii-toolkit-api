@@ -24,12 +24,12 @@ class AllegroOrderPayment(OrderPayment):
     def from_allegro_payment(cls, payment: allegro_payment, allegro_login: str):
         """Create AllegroOrderPayment from allegro Payment."""
         # allegro_login is used ONLY for details / UI
-        details = f"Buyer: {allegro_login}\n"
-        offer_text = "\n".join(f"{order.print_offers()}" for order in payment.orders)
-        details += offer_text
+        details = list[str]()
+        details.append(f"Buyer: {allegro_login}")
+        details.extend(payment.list_details())
         return cls(
             amount=payment.amount,
-            date=payment.date,
+            date=payment.date.date(),
             details=details,
             tag_done=TxTag.allegro_done,
             is_balanced=payment.is_balanced,

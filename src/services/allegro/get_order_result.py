@@ -50,6 +50,14 @@ class Order:
             for offer in self.offers
         )
 
+    def list_offers(self) -> list[str]:
+        """Return list of human readable representations of ordered offers."""
+        return [
+            f"{offer.get_simplified_title()} ({offer.unit_price} "
+            f"{offer.price_currency})"
+            for offer in self.offers
+        ]
+
     @property
     def order_date(self) -> datetime:
         """Return order date as ``datetime`` with timezone awareness."""
@@ -118,6 +126,13 @@ class Payment:
     payment_id: str
     orders: list["Order"]
     tolerance: Decimal = Decimal("0.01")
+
+    def list_details(self) -> list[str]:
+        """Return list of details for all orders in the payment."""
+        details = list[str]()
+        for order in self.orders:
+            details.extend(order.list_offers())
+        return details
 
     @property
     def sum_total_cost(self) -> Decimal:

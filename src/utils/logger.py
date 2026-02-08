@@ -5,7 +5,7 @@ from settings import settings
 
 
 class UTCFormatter(logging.Formatter):
-    converter = time.gmtime
+    converter = staticmethod(lambda ts=None: time.gmtime(ts))
 
 
 def setup_logging():
