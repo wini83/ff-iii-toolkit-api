@@ -1,4 +1,5 @@
 .env
+.env.*
 /alior.csv
 # Created by https://www.toptal.com/developers/gitignore/api/jetbrains
 # Edit at https://www.toptal.com/developers/gitignore?templates=jetbrains
@@ -132,8 +133,7 @@ __pycache__/
 *.pyc
 
 .venv/
-.vscode/
-data-legacy/
+
 
 .coverage
 coverage.xml

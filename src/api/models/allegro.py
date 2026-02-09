@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -33,6 +34,8 @@ class AllegroPayment(BaseModel):
     details: list[str]
     is_balanced: bool
     allegro_login: str
+    external_id: str
+    external_short_id: str
 
 
 class MatchResult(BaseModel):
@@ -49,3 +52,13 @@ class AllegroMatchResponse(BaseModel):
     transactions_with_many_matches: int
     fetch_seconds: float
     content: list[MatchResult]
+
+
+class MatchDecision(BaseModel):
+    payment_id: str  # allegro payment id
+    transaction_id: int  # firefly tx id
+    strategy: Literal["single", "manual", "force"] | None = None
+
+
+class ApplyPayload(BaseModel):
+    decisions: list[MatchDecision]

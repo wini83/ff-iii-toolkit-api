@@ -19,6 +19,8 @@ class AllegroOrderPayment(OrderPayment):
 
     is_balanced: bool
     allegro_login: str  # display metadata, NOT identity
+    external_short_id: str  # short ID of the payment
+    external_id: str  # full ID of the payment
 
     @classmethod
     def from_allegro_payment(cls, payment: allegro_payment, allegro_login: str):
@@ -26,7 +28,11 @@ class AllegroOrderPayment(OrderPayment):
         # allegro_login is used ONLY for details / UI
         details = list[str]()
         details.append(f"Buyer: {allegro_login}")
+        details.append(f"Payment ID: {payment.short_id}")
         details.extend(payment.list_details())
+        details.append(
+            f"Payment metadata: {payment.payment_method}/{payment.payment_provider}"
+        )
         return cls(
             amount=payment.amount,
             date=payment.date.date(),
@@ -34,6 +40,8 @@ class AllegroOrderPayment(OrderPayment):
             tag_done=TxTag.allegro_done,
             is_balanced=payment.is_balanced,
             allegro_login=allegro_login,
+            external_short_id=payment.short_id,
+            external_id=payment.payment_id,
         )
 
 

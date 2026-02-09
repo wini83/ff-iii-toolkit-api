@@ -1,3 +1,6 @@
+from dataclasses import dataclass
+from datetime import datetime
+from enum import Enum
 from uuid import UUID
 
 from api.mappers.allegro import map_match_result_to_api
@@ -16,6 +19,26 @@ from services.firefly_allegro_service import FireflyAllegroService
 from services.firefly_base_service import FireflyServiceError
 from services.tx_stats.models import MetricsState
 from services.user_secrets_service import UserSecretsService
+
+
+class ApplyJobStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+
+
+@dataclass(slots=True)
+class AllegroApplyJob:
+    id: UUID
+    secret_id: UUID
+    total: int
+    status: ApplyJobStatus
+    started_at: datetime
+    applied: int = 0
+    failed: int = 0
+
+    finished_at: datetime | None = None
 
 
 class AllegroApplicationService:
