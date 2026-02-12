@@ -5,8 +5,12 @@ from api.models.allegro import (
     AllegroMetricsResultResponse,
     AllegroMetricsStatusResponse,
     AllegroPayment,
+    ApplyJobResponse,
+    ApplyJobStatusResponse,
+    ApplyPayload,
 )
 from api.models.allegro import MatchResult as ApiMatchResult
+from services.domain.allegro import AllegroApplyJob, MatchDecision
 from services.domain.allegro import AllegroOrderPayment as AllegroOrderPaymentDomain
 from services.domain.allegro import AllegroOrderPayments as AllegroOrderPaymentsDomain
 from services.domain.match_result import MatchResult as DomainMatchResult
@@ -56,6 +60,8 @@ def map_allegro_payment_to_response(
         details=payment.details,
         is_balanced=payment.is_balanced,
         allegro_login=payment.allegro_login,
+        external_id=payment.external_id,
+        external_short_id=payment.external_short_id,
     )
 
 
@@ -98,3 +104,26 @@ def map_match_results_to_api(
     zero magic
     """
     return [map_match_result_to_api(result) for result in results]
+
+
+def map_job_to_response(job: AllegroApplyJob) -> ApplyJobResponse:
+    return ApplyJobResponse(
+        id=job.id,
+        status=ApplyJobStatusResponse[job.status.name.lower()],
+        total=job.total,
+        applied=job.applied,
+        failed=job.failed,
+    )
+
+
+def map_payload_to_decisions(
+    payload: ApplyPayload,
+) -> list[MatchDecision]:
+    return [
+        MatchDecision(
+            payment_id=d.payment_id,
+            transaction_id=d.transaction_id,
+            strategy=d.strategy,
+        )
+        for d in payload.decisions
+    ]

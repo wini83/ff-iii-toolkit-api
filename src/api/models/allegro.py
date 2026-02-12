@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from enum import Enum
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel
 
@@ -54,11 +56,26 @@ class AllegroMatchResponse(BaseModel):
     content: list[MatchResult]
 
 
-class MatchDecision(BaseModel):
+class ApplyDecision(BaseModel):
     payment_id: str  # allegro payment id
     transaction_id: int  # firefly tx id
-    strategy: Literal["single", "manual", "force"] | None = None
+    strategy: Literal["auto", "manual", "force"] = "auto"
 
 
 class ApplyPayload(BaseModel):
-    decisions: list[MatchDecision]
+    decisions: list[ApplyDecision]
+
+
+class ApplyJobStatusResponse(str, Enum):
+    pending = "pending"
+    running = "running"
+    done = "done"
+    failed = "failed"
+
+
+class ApplyJobResponse(BaseModel):
+    id: UUID
+    status: ApplyJobStatusResponse
+    total: int
+    applied: int
+    failed: int

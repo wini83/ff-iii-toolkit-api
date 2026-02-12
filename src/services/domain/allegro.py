@@ -1,4 +1,7 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from enum import Enum
+from typing import Literal
 from uuid import UUID
 
 from services.allegro.get_order_result import Payment as allegro_payment
@@ -50,3 +53,30 @@ class AllegroOrderPayments:
     """Collection of Allegro order payments."""
 
     payments: list[AllegroOrderPayment]
+
+
+@dataclass
+class MatchDecision:
+    payment_id: str
+    transaction_id: int
+    strategy: Literal["auto", "manual", "force"] = "auto"
+
+
+class ApplyJobStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+
+
+@dataclass(slots=True)
+class AllegroApplyJob:
+    id: UUID
+    secret_id: UUID
+    total: int
+    status: ApplyJobStatus
+    started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    applied: int = 0
+    failed: int = 0
+
+    finished_at: datetime | None = None
