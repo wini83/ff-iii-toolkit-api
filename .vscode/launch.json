@@ -1,0 +1,24 @@
+{
+    "name": "Debug CLI: allegro (uv + .cli.env)",
+    "type": "debugpy",
+    "request": "launch",
+    "module": "uv",
+    "args": [
+        "run",
+        "cli/allegro.py2",
+        "fetch",
+        "--dry-run"
+    ],
+    "console": "integratedTerminal",
+    "cwd": "${workspaceFolder}",
+    "envFile": "${workspaceFolder}/.env.cli",
+    "justMyCode": true,
+    "configurations": [
+        {
+            "name": "Python Debugger: Python File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}"
+        }
+    ]
+}

@@ -1,9 +1,18 @@
 import os
+import sys
+from pathlib import Path
 from pprint import pprint
 
 import requests
+from dotenv import load_dotenv
 
-from services.allegro.api import AllegroApiClient
+ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
+sys.path.insert(0, str(SRC))
+
+load_dotenv(Path(__file__).parent.parent / ".env.cli")
+
+from services.allegro.api import AllegroApiClient  # noqa: E402
 
 
 def main() -> None:

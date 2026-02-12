@@ -40,7 +40,10 @@ class Order:
         self._order_date = items["orderDate"]
         self.total_cost_amount: Decimal = Decimal(items["totalCost"]["amount"])
         self.payment_amount = Decimal(items["payment"]["amount"]["amount"])
-        self.payment_id = items["payment"]["id"]
+        self.currency_code = items["payment"]["amount"]["currency"]
+        self.payment_provider: str = items["payment"]["provider"]
+        self.payment_method: str = items["payment"]["method"]
+        self.payment_id: str = items["payment"]["id"]
 
     def print_offers(self) -> str:
         """Return human readable representation of ordered offers."""
@@ -127,6 +130,11 @@ class Payment:
     orders: list["Order"]
     tolerance: Decimal = Decimal("0.01")
 
+    @property
+    def short_id(self) -> str:
+        """Return short, deterministic ID for the payment."""
+        return short_id(self.payment_id)
+
     def list_details(self) -> list[str]:
         """Return list of details for all orders in the payment."""
         details = list[str]()
@@ -149,6 +157,27 @@ class Payment:
         return self.orders[0].payment_amount
 
     @property
+    def currency_code(self) -> str:
+        """Return currency code of the payment."""
+        if not self.orders:
+            raise ValueError("No orders in payment")
+        return self.orders[0].currency_code
+
+    @property
+    def payment_provider(self) -> str:
+        """Return payment provider."""
+        if not self.orders:
+            raise ValueError("No orders in payment")
+        return self.orders[0].payment_provider
+
+    @property
+    def payment_method(self) -> str:
+        """Return payment method."""
+        if not self.orders:
+            raise ValueError("No orders in payment")
+        return self.orders[0].payment_method
+
+    @property
     def date(self) -> datetime:
         """Return payment date."""
         if not self.orders:
@@ -162,7 +191,8 @@ class Payment:
 
     def __str__(self) -> str:
         return (
-            f"Payment {short_id(self.payment_id)}: "
+            f"Payment {self.short_id}: "
+            f"Payment metadata: {self.payment_provider}/{self.payment_method} "
             f"{len(self.orders)} orders, {self.amount:.2f} "
             f"total, balanced: {self.is_balanced}"
         )
