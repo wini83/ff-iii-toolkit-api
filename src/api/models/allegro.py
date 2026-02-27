@@ -73,9 +73,19 @@ class ApplyJobStatusResponse(str, Enum):
     failed = "failed"
 
 
+class ApplyOutcomeResponse(BaseModel):
+    transaction_id: int
+    status: Literal["success", "failed"]
+    reason: str | None = None
+
+
 class ApplyJobResponse(BaseModel):
     id: UUID
+    secret_id: UUID
     status: ApplyJobStatusResponse
     total: int
     applied: int
     failed: int
+    started_at: datetime
+    finished_at: datetime | None
+    results: list[ApplyOutcomeResponse]
