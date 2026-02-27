@@ -7,10 +7,11 @@ from api.models.allegro import (
     AllegroPayment,
     ApplyJobResponse,
     ApplyJobStatusResponse,
+    ApplyOutcomeResponse,
     ApplyPayload,
 )
 from api.models.allegro import MatchResult as ApiMatchResult
-from services.domain.allegro import AllegroApplyJob, MatchDecision
+from services.domain.allegro import AllegroApplyJob, ApplyOutcome, MatchDecision
 from services.domain.allegro import AllegroOrderPayment as AllegroOrderPaymentDomain
 from services.domain.allegro import AllegroOrderPayments as AllegroOrderPaymentsDomain
 from services.domain.match_result import MatchResult as DomainMatchResult
@@ -109,10 +110,22 @@ def map_match_results_to_api(
 def map_job_to_response(job: AllegroApplyJob) -> ApplyJobResponse:
     return ApplyJobResponse(
         id=job.id,
+        secret_id=job.secret_id,
         status=ApplyJobStatusResponse[job.status.name.lower()],
         total=job.total,
         applied=job.applied,
         failed=job.failed,
+        started_at=job.started_at,
+        finished_at=job.finished_at,
+        results=[map_apply_outcome_to_response(result) for result in job.results],
+    )
+
+
+def map_apply_outcome_to_response(outcome: ApplyOutcome) -> ApplyOutcomeResponse:
+    return ApplyOutcomeResponse(
+        transaction_id=outcome.transaction_id,
+        status=outcome.status,
+        reason=outcome.reason,
     )
 
 

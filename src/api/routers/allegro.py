@@ -1,7 +1,7 @@
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.deps_runtime import get_allegro_application_runtime
 from api.mappers.allegro import (
@@ -90,6 +90,41 @@ async def apply_matches(
         raise HTTPException(status_code=400, detail=str(e)) from e
     except ExternalServiceFailed as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
+
+
+@router.post("/{secret_id}/apply/auto", response_model=ApplyJobResponse)
+async def auto_apply_single_matches(
+    secret_id: str,
+    limit: int | None = Query(default=None, ge=1, le=500),
+    # dry_run: bool = Query(default=False),
+    # user_id: UUID = Depends(require_active_user),
+    svc: AllegroApplicationService = Depends(get_allegro_application_runtime),
+):
+    """
+    Automatically apply matches that have exactly one candidate match.
+    Requires that /{secret_id}/matches was called before (preview snapshot exists).
+    """
+    try:
+        result = await svc.start_auto_apply_single_matches(
+            secret_id=UUID(secret_id), limit=limit
+        )
+
+        # result is expected to contain:
+        # - job: AllegroApplyJob | None
+        # - auto_selected: int
+        # - skipped: int
+        # - dry_run: bool
+        return map_job_to_response(result)
+
+    except MatchesNotComputed as e:
+        raise HTTPException(
+            status_code=400, detail="No match data found; run preview first"
+        ) from e
+    except ExternalServiceFailed as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+    except ValueError as e:
+        # UUID(secret_id) parsing error
+        raise HTTPException(status_code=400, detail="Invalid secret_id") from e
 
 
 @router.get("/apply-jobs/{job_id}", response_model=ApplyJobResponse)

@@ -13,6 +13,7 @@ from services.domain.allegro import (
     AllegroApplyJob,
     AllegroOrderPayment,
     ApplyJobStatus,
+    ApplyOutcome,
     MatchDecision,
 )
 from services.domain.match_result import MatchResult
@@ -176,19 +177,16 @@ class AllegroApplicationService:
                 tx = cast(Transaction, match_result.tx)
                 await self.ff_allegro_service.apply_match(tx=tx, evidence=payment)
                 job.applied += 1
-                job.successful_tx_ids.append(tx_id)
+                job.results.append(ApplyOutcome(transaction_id=tx_id, status="success"))
 
-            except Exception:
+            except Exception as e:
                 job.failed += 1
-                job.failed_tx_ids.append(tx_id)
+                job.results.append(
+                    ApplyOutcome(transaction_id=tx_id, status="failed", reason=str(e))
+                )
 
         job.status = ApplyJobStatus.DONE
         job.finished_at = datetime.now(UTC)
-
-        # invalidate preview
-        # self._matches_cache.pop(str(secret_id), None)
-
-        # await self.allegro_metrics_manager.refresh()
 
     async def start_auto_apply_single_matches(
         self,
