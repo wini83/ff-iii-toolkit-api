@@ -128,6 +128,12 @@
 - **api**: - extract upload and file endpoints into separate routers - move csv parsing and transaction processing to services/ - add centralized logging and encoding utilities - introduce config module for env settings - create clean app entrypoint with router registration - improve project structure for scalability and maintainability
 - **all**: black isort ruff
 
+## v2.6.0b1 (2026-02-27)
+
+### Feat
+
+- **allegro**: auto-apply single matches with job tracking
+
 ## v2.6.0b0 (2026-02-12)
 
 ### Refactor
