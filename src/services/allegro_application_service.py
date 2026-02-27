@@ -162,8 +162,8 @@ class AllegroApplicationService:
         index = {int(cast(Transaction, m.tx).id): m for m in matches}
 
         for decision in decisions:
+            tx_id = decision.transaction_id
             try:
-                tx_id = decision.transaction_id
                 match_result = index.get(tx_id)
                 if not match_result:
                     raise TransactionNotFound(f"Transaction id {tx_id} not found")
@@ -176,9 +176,11 @@ class AllegroApplicationService:
                 tx = cast(Transaction, match_result.tx)
                 await self.ff_allegro_service.apply_match(tx=tx, evidence=payment)
                 job.applied += 1
+                job.successful_tx_ids.append(tx_id)
 
             except Exception:
                 job.failed += 1
+                job.failed_tx_ids.append(tx_id)
 
         job.status = ApplyJobStatus.DONE
         job.finished_at = datetime.now(UTC)
@@ -187,6 +189,33 @@ class AllegroApplicationService:
         # self._matches_cache.pop(str(secret_id), None)
 
         # await self.allegro_metrics_manager.refresh()
+
+    async def start_auto_apply_single_matches(
+        self,
+        *,
+        secret_id: UUID,
+        limit: int | None = None,
+    ) -> AllegroApplyJob:
+        matches = self.state_store.matches_cache.get(str(secret_id))
+        if not matches:
+            raise MatchesNotComputed()
+        single = [m for m in matches if len(m.matches) == 1]
+
+        if limit:
+            single = single[:limit]
+
+        decisions = [
+            MatchDecision(
+                transaction_id=int(cast(Transaction, m.tx).id),
+                payment_id=cast(AllegroOrderPayment, m.matches[0]).external_short_id,
+            )
+            for m in single
+        ]
+
+        return await self.start_apply_job(
+            secret_id=secret_id,
+            decisions=decisions,
+        )
 
     # --------------------------------------------------
     # METRICS V2

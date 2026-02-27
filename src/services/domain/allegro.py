@@ -78,5 +78,7 @@ class AllegroApplyJob:
     started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     applied: int = 0
     failed: int = 0
+    successful_tx_ids: list[int] = field(default_factory=list)
+    failed_tx_ids: list[int] = field(default_factory=list)
 
     finished_at: datetime | None = None
