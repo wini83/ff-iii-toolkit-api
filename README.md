@@ -1,140 +1,234 @@
 # Firefly III Toolkit API
+FastAPI backend for reconciling Firefly III transactions with BLIK CSV imports and Allegro payments, with authenticated multi-user operations.
+
 [![Build & Publish Docker Image](https://github.com/wini83/ff-iii-toolkit-api/actions/workflows/build.yml/badge.svg)](https://github.com/wini83/ff-iii-toolkit-api/actions/workflows/build.yml)
 [![CodeQL Advanced](https://github.com/wini83/ff-iii-toolkit-api/actions/workflows/codeql.yml/badge.svg)](https://github.com/wini83/ff-iii-toolkit-api/actions/workflows/codeql.yml)
 [![Lint (ruff)](https://github.com/wini83/ff-iii-toolkit-api/actions/workflows/lint.yml/badge.svg)](https://github.com/wini83/ff-iii-toolkit-api/actions/workflows/lint.yml)
+[![tests-with-coverage](https://github.com/wini83/ff-iii-toolkit-api/actions/workflows/pytest_coverage.yml/badge.svg)](https://github.com/wini83/ff-iii-toolkit-api/actions/workflows/pytest_coverage.yml)
 [![codecov](https://codecov.io/github/wini83/ff-iii-toolkit-api/graph/badge.svg?token=R5ULUOVPH1)](https://codecov.io/github/wini83/ff-iii-toolkit-api)
 ![Python](https://img.shields.io/badge/python-3.12-blue)
 
-Backend FastAPI service that helps match and update BLIK transactions in Firefly III using bank CSV exports. Upload a statement, preview parsed rows, review matches, and bulk-apply tags/notes in Firefly.
+## Table of contents
+- [What it does](#what-it-does)
+- [Key features](#key-features)
+- [Architecture](#architecture)
+- [Getting started](#getting-started)
+- [Configuration (.env)](#configuration-env)
+- [API overview](#api-overview)
+- [Development](#development)
+- [CI/CD](#cicd)
+- [Security notes](#security-notes)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License](#license)
 
-## Status
-Internal tool, actively developed. No persistent database; in-memory match cache is reset on restart. Docker images are published to GHCR from `main`.
+## What it does
+Use-cases:
+- Import BLIK bank CSV files, preview parsed rows, compute matches against Firefly III transactions, and apply selected one-to-one matches.
+- Pull Allegro payments (per stored user secret), preview matching against Firefly III transactions, and run async apply jobs.
+- Screen uncategorized Firefly III transactions by month and apply categories/tags from the API.
+- Manage local API users (bootstrap, create/disable/promote, audit log) and user-owned external secrets.
 
-## Features
-- CSV ingest and preview for Polish bank statement formats.
-- Match pipeline against Firefly III transactions with configurable filters.
-- Bulk apply notes/description updates and a "done" tag.
-- JWT auth with a simple user list from `.env`.
-- Docker-first deployment with optional Nginx proxy.
+Non-goals:
+- Not a Firefly III replacement or general-purpose accounting backend.
+- Not a durable job queue system; matching/apply runtime state is process memory.
+- Not a frontend UI in this repository.
 
-## Architecture (high-level)
-- FastAPI app (`src/main.py`) with routers:
-  - `auth`: JWT token issuance from `/api/auth/token`.
-  - `system`: health/version endpoints under `/api/system/*`.
-  - `blik_files`: CSV upload -> preview -> match -> apply flow.
-- CSV ingest: files stored temporarily in `/tmp`, parsed by `BankCSVReader`.
-- Matching: `TransactionProcessor.match` queries Firefly, filters by `BLIK_DESCRIPTION_FILTER`, excludes `TAG_BLIK_DONE`, and computes candidates.
-- Apply: writes updates in Firefly and tags transactions. Match results are cached in-process (`MEM_MATCHES`) and cleared on restart.
-- Middleware: CORS (via `ALLOWED_ORIGINS`), logging to `blik_sync.log` and stdout.
+## Key features
+- FastAPI app with JWT access tokens and refresh-token cookie flow.
+- SQLite/SQLAlchemy persistence with Alembic migrations for users, audit log, and user secrets.
+- Runtime services for BLIK, Allegro, and transaction screening flows.
+- Superuser-only user administration and audit-log querying.
+- Health/version/bootstrap system endpoints.
+- Docker image build with migration-on-start entrypoint.
 
-## Tech stack
-- Backend: Python 3.12, FastAPI, Starlette, Pydantic v2, PyJWT, `fireflyiii-enricher-core`
-- Runtime: uvicorn, python-dotenv
-- Tooling: `uv`, pytest, black, ruff, isort, mypy, commitizen
-- Infra: Docker, docker-compose, GitHub Actions
+## Architecture
+High level:
+- API layer: `src/api/routers/*`.
+- Application services: `src/services/*_application_service.py`.
+- Firefly integration: `src/services/firefly_*_service.py` via `ff-iii-luciferin` client.
+- Persistence: SQLAlchemy models/repositories in `src/services/db/*` with Alembic migrations in `alembic/`.
+- Runtime state: in-memory caches for BLIK matches, Allegro matches/jobs, and metrics states.
 
-## Requirements
-- Python >= 3.12
-- `uv` (https://github.com/astral-sh/uv) or `pip`/`venv`
-- Firefly III API access + personal access token
-- Docker (optional, for production/runtime)
+Request flow:
+```text
+Client
+  -> FastAPI Router (/api/...)
+    -> Auth guards (JWT + DB user checks)
+      -> Application Service
+        -> Firefly/Allegro integration and/or DB repositories
+          -> Response DTO mapper
+            -> Client
+```
 
-## Quick start (local)
+## Getting started
+### Local
 ```bash
-# 1) Install deps
-uv sync
-
-# 2) Configure
 cp .env.example .env
 
-# 3) Run API
-uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+# install dependencies
+uv sync --frozen --dev
 
-# 4) Health check
+# initialize DB schema
+uv run alembic upgrade head
+
+# start API (same as make dev)
+PYTHONPATH=src uv run uvicorn main:create_production_app --factory --reload --app-dir src
+```
+
+Health check:
+```bash
 curl http://localhost:8000/api/system/health
 ```
 
-Auth:
-```bash
-# x-www-form-urlencoded token request
-curl -X POST http://localhost:8000/api/auth/token \
-  -d 'username=user1&password=secret' \
-  | jq -r .access_token
-
-# use in requests: Authorization: Bearer <token>
-```
-
-## Configuration
-Start with `.env.example` and fill in:
-- `FIREFLY_URL`: Firefly III API base URL.
-- `FIREFLY_TOKEN`: Firefly personal access token.
-- `USERS`: comma-separated `user:pass` list.
-- `SECRET_KEY` / `ALGORITHM` / `ACCESS_TOKEN_EXPIRE_MINUTES`: JWT settings (must be consistent for issuing and validating tokens).
-- `ALLOWED_ORIGINS`: `*`, CSV (`a,b,c`), or JSON list for CORS.
-- `DEMO_MODE`: feature flag (currently unused).
-- `BLIK_DESCRIPTION_FILTER`: description fragment used to filter Firefly transactions.
-- `TAG_BLIK_DONE`: tag applied after `apply`.
-
-Note: avoid spaces around `=` in `.env` for predictable parsing.
-
-## API flow (BLIK)
-1. `POST /api/blik_files` with CSV file (`file` in form-data) -> returns `id`.
-2. `GET /api/blik_files/{id}` -> preview parsed rows.
-3. `GET /api/blik_files/{id}/matches` -> match results and stats.
-4. `POST /api/blik_files/{id}/matches` with `{ "tx_indexes": [<id_csv>, ...] }` for rows that have exactly one match.
-
-## API reference (summary)
-| Method | Endpoint | Description | Auth |
-| --- | --- | --- | --- |
-| POST | `/api/auth/token` | Issue JWT access token | No |
-| GET | `/api/system/health` | Health check | No |
-| GET | `/api/system/version` | Version info | No |
-| POST | `/api/blik_files` | Upload CSV file | Yes |
-| GET | `/api/blik_files/{id}` | Preview parsed CSV rows | Yes |
-| GET | `/api/blik_files/{id}/matches` | Compute and list match candidates | Yes |
-| POST | `/api/blik_files/{id}/matches` | Apply matches for selected rows | Yes |
-
-## Docker
-Build/run locally:
+### Docker
 ```bash
 docker build -t ff-iii-toolkit-api:local .
-docker run --env-file .env -p 8000:8000 ff-iii-toolkit-api:local
+docker run --rm --env-file .env -p 8000:8000 ff-iii-toolkit-api:local
 ```
 
-Compose (backend + proxy to Firefly on host):
-```bash
-cd infra
-docker compose up -d
-```
-Edit `infra/nginx-firefly.conf` if your Firefly instance listens on a different host/port.
+Notes:
+- Container entrypoint runs `alembic upgrade head` before starting `uvicorn`.
+- API listens on port `8000`.
 
-## CI/CD
-- `.github/workflows/build.yml`: builds and publishes images to GHCR on `main` and `v*` tags.
-- Tests are not enforced in the pipeline; run locally before release.
+### Docker Compose
+No `docker-compose.yml` / `compose.yaml` exists in this repository at the moment.
 
-## Repository structure
-- `src/main.py` - FastAPI app and router/middleware wiring.
-- `src/api/routers/` - `auth`, `blik_files`, `system`.
-- `src/api/models/` - Pydantic request/response models.
-- `src/services/` - CSV parser, auth utils, transaction processor.
-- `src/utils/` - logger and helpers.
-- `infra/` - `docker-compose.yml`, `nginx-firefly.conf`.
-- `Dockerfile` - multi-stage build using `uv`.
-- `makefile` - shortcuts (`make dev`, `make test`).
-- `tests/` - tests for `SimplifiedRecord.pretty_print`.
+Assumption:
+- If compose is required, verify whether it lives in another repo or branch.
 
-## Troubleshooting
-- 500 on `/statistics` `/matches` `/apply`: missing `FIREFLY_URL` or `FIREFLY_TOKEN`.
-- 401 after login: `SECRET_KEY`/`ALGORITHM` mismatch between token issuance and validation environment.
-- No matches: verify `BLIK_DESCRIPTION_FILTER` and ensure transactions are not already tagged with `TAG_BLIK_DONE`.
-- "No match data found" during apply: in-memory cache cleared on restart; call `/matches` again.
-- CORS blocked: set `ALLOWED_ORIGINS` to correct CSV/JSON or `*`.
-- Missing CSV preview: files live in `/tmp/<id>.csv`; cleanup or restart removes them.
+## Configuration (.env)
+Documented keys that currently exist in `.env.example` and/or code:
+
+| Variable | Source | Description |
+| --- | --- | --- |
+| `FIREFLY_URL` | `.env.example`, `src/settings.py` | Firefly III base URL used by service clients. |
+| `FIREFLY_TOKEN` | `.env.example`, `src/settings.py` | Firefly III API token. |
+| `SECRET_KEY` | `.env.example`, `src/settings.py` | JWT signing key (required). |
+| `ALGORITHM` | `.env.example`, `src/settings.py` | JWT algorithm (default `HS256`). |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `.env.example`, `src/settings.py` | Access-token TTL in minutes. |
+| `DEMO_MODE` | `.env.example`, `src/settings.py` | Feature flag (currently not used by routers/services). |
+| `LOG_LEVEL` | `.env.example`, `src/settings.py` | Root logging level. |
+| `ALLOWED_ORIGINS` | `.env.example`, `src/settings.py` | CORS origins (`*`, CSV list, or JSON list). |
+| `BLIK_DESCRIPTION_FILTER` | `.env.example`, `src/settings.py` | BLIK text filter used in matching/screening. |
+| `TAG_BLIK_DONE` | `.env.example`, `src/settings.py` | Tag treated as completed BLIK processing. |
+| `USERS` | `.env.example` only | Legacy key; current auth uses DB users, not this variable. |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | `src/settings.py` | Refresh-token TTL in days. |
+| `REFRESH_COOKIE_NAME` | `src/settings.py` | Cookie name for refresh token. |
+| `REFRESH_TOKEN_SECURE` | `src/settings.py` | Sets `Secure` flag on refresh cookie. |
+| `DATABASE_URL` / `database_url` | `src/settings.py` | SQLAlchemy DB URL (default `sqlite:///./data/app.db`). |
+
+## API overview
+- OpenAPI JSON: `/openapi.json`
+- Swagger UI: `/docs`
+- ReDoc: `/redoc`
+
+Endpoint summary from current routers:
+
+| Method | Path | Auth | Description |
+| --- | --- | --- | --- |
+| `POST` | `/api/auth/token` | No | Issue access token and set refresh-token cookie. |
+| `POST` | `/api/auth/refresh` | Refresh cookie | Issue new access token from refresh token. |
+| `GET` | `/api/me` | Active user | Return current user profile. |
+| `GET` | `/api/system/health` | No | API + DB health and bootstrap status. |
+| `GET` | `/api/system/version` | No | API version from `pyproject.toml`. |
+| `GET` | `/api/system/bootstrap/status` | No | Whether first superuser exists. |
+| `POST` | `/api/system/bootstrap` | No | Create first superuser (one-time). |
+| `GET` | `/api/blik_files/statistics` | Active user | Legacy BLIK statistics endpoint (deprecated). |
+| `POST` | `/api/blik_files/statistics/refresh` | Active user | Legacy BLIK statistics refresh (deprecated). |
+| `GET` | `/api/blik_files/statistics_v2` | Active user | Get async BLIK metrics job state/result. |
+| `POST` | `/api/blik_files/statistics_v2/refresh` | Active user | Trigger BLIK metrics recomputation. |
+| `POST` | `/api/blik_files` | Active user | Upload CSV file for BLIK processing. |
+| `GET` | `/api/blik_files/{encoded_id}` | Active user | Preview uploaded CSV rows. |
+| `GET` | `/api/blik_files/{encoded_id}/matches` | Active user | Compute BLIK-to-Firefly match candidates. |
+| `POST` | `/api/blik_files/{encoded_id}/matches` | Active user | Apply selected BLIK matches. |
+| `GET` | `/api/tx/screening` | Active user | List month transactions eligible for manual categorization. |
+| `POST` | `/api/tx/{tx_id}/category/{category_id}` | Active user | Apply category to transaction. |
+| `POST` | `/api/tx/{tx_id}/tag/` | Active user | Add tag to transaction. |
+| `GET` | `/api/tx/statistics` | Active user | Get transaction metrics state/result. |
+| `POST` | `/api/tx/statistics/refresh` | Active user | Trigger transaction metrics recomputation. |
+| `GET` | `/api/allegro/secrets` | Active user | List current user Allegro-type secrets. |
+| `GET` | `/api/allegro/{secret_id}/payments` | Active user | Fetch Allegro payments for a secret. |
+| `GET` | `/api/allegro/{secret_id}/matches` | Active user | Compute Allegro-to-Firefly matches. |
+| `POST` | `/api/allegro/{secret_id}/apply` | Active user | Start async apply job with explicit decisions. |
+| `POST` | `/api/allegro/{secret_id}/apply/auto` | Active user | Auto-apply one-candidate matches (optional limit). |
+| `GET` | `/api/allegro/apply-jobs/{job_id}` | Active user | Read async Allegro apply job status/result. |
+| `GET` | `/api/allegro/statistics` | Active user | Get Allegro metrics state/result. |
+| `POST` | `/api/allegro/statistics/refresh` | Active user | Trigger Allegro metrics recomputation. |
+| `POST` | `/api/user-secrets` | Active user | Store a user-owned secret (type + value). |
+| `GET` | `/api/user-secrets` | Active user | List current user secrets (without secret value). |
+| `DELETE` | `/api/user-secrets/{secret_id}` | Active user | Delete own secret. |
+| `GET` | `/api/users` | Superuser | List users. |
+| `POST` | `/api/users` | Superuser | Create user. |
+| `POST` | `/api/users/{user_id}/disable` | Superuser | Disable user. |
+| `POST` | `/api/users/{user_id}/enable` | Superuser | Enable user. |
+| `POST` | `/api/users/{user_id}/promote` | Superuser | Promote to superuser. |
+| `POST` | `/api/users/{user_id}/demote` | Superuser | Demote from superuser. |
+| `DELETE` | `/api/users/{user_id}` | Superuser | Delete user. |
+| `GET` | `/api/users/audit-log` | Superuser | Query audit-log entries. |
 
 ## Development
-- Logs: stdout and `blik_sync.log` in the working directory.
-- Tests: `uv run pytest` or `make test`.
-- Lint/format: `uv run ruff check`, `uv run black .`, `uv run mypy`.
+```bash
+# run tests
+uv run pytest
+
+# coverage (local)
+uv run pytest --cov
+
+# lint + format
+uv run ruff check . --fix
+uv run ruff format .
+
+# type checking
+uv run env PYTHONPATH=src mypy .
+
+# pre-commit (if installed)
+uv run pre-commit run --all-files
+```
+
+Make shortcuts:
+```bash
+make dev
+make test
+make cov
+make ruff
+make mypy
+make pre
+```
+
+## CI/CD
+- `lint.yml`: runs Ruff on push (`main`, `dev`) and on pull requests.
+- `pytest_coverage.yml`: runs tests with coverage on push to `main` and on pull requests; uploads to Codecov.
+- `codeql.yml`: CodeQL analysis on push/PR to `main` and weekly schedule.
+- `build.yml`: builds and pushes Docker image to GHCR on tag pushes matching `v*`.
+
+Image tags from `build.yml` metadata:
+- `sha` tag.
+- Git ref tag (for example `v2.6.0b0`).
+- `latest` is configured but currently gated by `main` branch condition while workflow triggers only on tag pushes.
+
+## Security notes
+- Access tokens are JWT bearer tokens; refresh tokens are HTTP-only cookies.
+- `SECRET_KEY` must be strong and private.
+- Set `REFRESH_TOKEN_SECURE=true` behind HTTPS.
+- User secrets are persisted in DB and currently stored plaintext (`src/services/db/models.py` comment marks this as MVP).
+- Firefly and external API tokens must be treated as secrets and never committed.
+- CORS is fully configurable; avoid `*` in production unless intentional.
+
+## Troubleshooting
+- `500` with message about schema not initialized: run `uv run alembic upgrade head` (or let Docker entrypoint run migrations).
+- `401` on protected endpoints: ensure `Authorization: Bearer <access_token>` is present and user is active.
+- `403` on `/api/users/*`: route requires superuser.
+- `401` on `/api/auth/refresh`: refresh cookie missing/expired/invalid.
+- `404 File not found` for BLIK preview/matches: uploaded CSV temp file is missing from system temp dir.
+- `400 No match data found`: run preview matching endpoint first; caches are in-memory and reset on restart.
+- Firefly-related `502`: verify `FIREFLY_URL`, `FIREFLY_TOKEN`, and upstream Firefly availability.
+
+## Contributing
+1. Create a branch from `main`.
+2. Run local quality checks (`pytest`, `ruff`, `mypy`) before opening a PR.
+3. Keep API and model changes covered by tests under `tests/`.
+4. Use conventional commits if you rely on the release/changelog flow (`commitizen` config is present).
 
 ## License
-See `LICENSE`.
+MIT. See [LICENSE](LICENSE).
