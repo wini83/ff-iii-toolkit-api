@@ -17,6 +17,7 @@ from api.models.allegro import ApplyDecision, ApplyPayload
 from services.domain.allegro import (
     AllegroApplyJob,
     AllegroOrderPayment,
+    ApplyOutcome,
     ApplyJobStatus,
 )
 from services.domain.match_result import MatchResult
@@ -161,6 +162,29 @@ def test_map_job_to_response():
     assert resp.total == 3
     assert resp.applied == 2
     assert resp.failed == 1
+    assert resp.results == []
+
+
+def test_map_job_to_response_with_mixed_outcomes():
+    job = AllegroApplyJob(
+        id=uuid4(),
+        secret_id=uuid4(),
+        total=2,
+        status=ApplyJobStatus.DONE,
+        started_at=datetime.now(UTC),
+        applied=1,
+        failed=1,
+        results=[
+            ApplyOutcome(transaction_id=1, status="success"),
+            ApplyOutcome(transaction_id=2, status="failed", reason="boom"),
+        ],
+    )
+
+    resp = map_job_to_response(job)
+
+    assert [r.status for r in resp.results] == ["success", "failed"]
+    assert resp.results[0].reason is None
+    assert resp.results[1].reason == "boom"
 
 
 def test_map_payload_to_decisions():

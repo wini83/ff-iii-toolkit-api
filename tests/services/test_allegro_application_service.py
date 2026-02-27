@@ -195,6 +195,60 @@ async def test_run_apply_job_counts_success_and_failures():
     assert job.finished_at is not None
 
 
+@pytest.mark.anyio
+async def test_start_auto_apply_single_matches_raises_when_matches_not_computed():
+    service = _service()
+    with pytest.raises(MatchesNotComputed):
+        await service.start_auto_apply_single_matches(secret_id=uuid4())
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("limit", "expected_pairs"),
+    [
+        (None, [(1, "single-1"), (4, "single-4")]),
+        (1, [(1, "single-1")]),
+    ],
+)
+async def test_start_auto_apply_single_matches_builds_decisions_for_single_matches_only(
+    limit, expected_pairs
+):
+    secret_id = uuid4()
+    store = AllegroStateStore(
+        matches_cache={
+            str(secret_id): [
+                MatchResult(tx=_tx(1), matches=[_payment("single-1", "full-1")]),
+                MatchResult(
+                    tx=_tx(2),
+                    matches=[_payment("multi-1", "full-2"), _payment("multi-2", "full-3")],
+                ),
+                MatchResult(tx=_tx(3), matches=[]),
+                MatchResult(tx=_tx(4), matches=[_payment("single-4", "full-4")]),
+            ]
+        }
+    )
+    service = _service(store)
+    job = AllegroApplyJob(
+        id=uuid4(),
+        secret_id=secret_id,
+        total=len(expected_pairs),
+        status=ApplyJobStatus.PENDING,
+    )
+    service.start_apply_job = AsyncMock(return_value=job)
+
+    returned_job = await service.start_auto_apply_single_matches(
+        secret_id=secret_id,
+        limit=limit,
+    )
+
+    service.start_apply_job.assert_awaited_once()
+    call = service.start_apply_job.await_args
+    assert call.kwargs["secret_id"] == secret_id
+    decisions = call.kwargs["decisions"]
+    assert [(d.transaction_id, d.payment_id) for d in decisions] == expected_pairs
+    assert returned_job is job
+
+
 def test_get_metrics_state_recreates_manager_if_missing():
     service = _service()
     service.state_store.metrics_manager = None
