@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from enum import Enum
 from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel
 
+from api.models.job_base import JobStatus
 from api.models.tx import SimplifiedTx
 
 
@@ -20,7 +20,7 @@ class AllegroMetricsResultResponse(BaseModel):
 
 
 class AllegroMetricsStatusResponse(BaseModel):
-    status: str
+    status: JobStatus
     progress: str | None
     result: AllegroMetricsResultResponse | None
     error: str | None
@@ -66,13 +66,6 @@ class ApplyPayload(BaseModel):
     decisions: list[ApplyDecision]
 
 
-class ApplyJobStatusResponse(str, Enum):
-    pending = "pending"
-    running = "running"
-    done = "done"
-    failed = "failed"
-
-
 class ApplyOutcomeResponse(BaseModel):
     transaction_id: int
     status: Literal["success", "failed"]
@@ -82,7 +75,7 @@ class ApplyOutcomeResponse(BaseModel):
 class ApplyJobResponse(BaseModel):
     id: UUID
     secret_id: UUID
-    status: ApplyJobStatusResponse
+    status: JobStatus
     total: int
     applied: int
     failed: int

@@ -4,7 +4,7 @@ import pytest
 
 import services.allegro_stats.manager as manager_module
 from services.allegro_stats.manager import AllegroMetricsManager
-from services.tx_stats.models import JobStatus
+from services.domain.job_base import JobStatus
 
 
 @pytest.fixture(scope="module")

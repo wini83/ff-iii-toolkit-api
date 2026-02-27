@@ -5,7 +5,8 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from services.allegro_stats.manager import AllegroMetricsManager
-from services.domain.allegro import AllegroApplyJob, ApplyJobStatus
+from services.domain.allegro import AllegroApplyJob
+from services.domain.job_base import JobStatus
 from services.domain.match_result import MatchResult
 
 
@@ -18,7 +19,7 @@ class AllegroApplyJobManager:
             id=uuid4(),
             secret_id=secret_id,
             total=total,
-            status=ApplyJobStatus.PENDING,
+            status=JobStatus.PENDING,
             started_at=datetime.now(UTC),
         )
         self._jobs[job.id] = job

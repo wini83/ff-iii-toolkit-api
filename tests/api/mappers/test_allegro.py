@@ -17,14 +17,14 @@ from api.models.allegro import ApplyDecision, ApplyPayload
 from services.domain.allegro import (
     AllegroApplyJob,
     AllegroOrderPayment,
-    ApplyJobStatus,
     ApplyOutcome,
 )
+from services.domain.job_base import JobStatus
 from services.domain.match_result import MatchResult
 from services.domain.metrics import AllegroMetrics
 from services.domain.transaction import Currency, Transaction, TxType
 from services.domain.transaction import TxTag as DomainTxTag
-from services.tx_stats.models import JobStatus, MetricsState
+from services.tx_stats.models import MetricsState
 
 
 def _tx():
@@ -150,7 +150,7 @@ def test_map_job_to_response():
         id=uuid4(),
         secret_id=uuid4(),
         total=3,
-        status=ApplyJobStatus.DONE,
+        status=JobStatus.DONE,
         started_at=datetime.now(UTC),
         applied=2,
         failed=1,
@@ -170,7 +170,7 @@ def test_map_job_to_response_with_mixed_outcomes():
         id=uuid4(),
         secret_id=uuid4(),
         total=2,
-        status=ApplyJobStatus.DONE,
+        status=JobStatus.DONE,
         started_at=datetime.now(UTC),
         applied=1,
         failed=1,

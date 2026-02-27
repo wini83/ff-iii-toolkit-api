@@ -1,12 +1,12 @@
 from collections.abc import Iterable
 
+from api.mappers.job_status import map_status
 from api.mappers.tx import map_tx_to_api
 from api.models.allegro import (
     AllegroMetricsResultResponse,
     AllegroMetricsStatusResponse,
     AllegroPayment,
     ApplyJobResponse,
-    ApplyJobStatusResponse,
     ApplyOutcomeResponse,
     ApplyPayload,
 )
@@ -35,7 +35,7 @@ def map_allegro_metrics_state_to_response(
         )
 
     return AllegroMetricsStatusResponse(
-        status=state.status.value,
+        status=map_status(state.status),
         progress=state.progress,
         result=result,
         error=state.error,
@@ -111,7 +111,7 @@ def map_job_to_response(job: AllegroApplyJob) -> ApplyJobResponse:
     return ApplyJobResponse(
         id=job.id,
         secret_id=job.secret_id,
-        status=ApplyJobStatusResponse[job.status.name.lower()],
+        status=map_status(job.status),
         total=job.total,
         applied=job.applied,
         failed=job.failed,

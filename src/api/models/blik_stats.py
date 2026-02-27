@@ -4,6 +4,8 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+from api.models.job_base import JobStatus
+
 
 class BlikMetricsResultResponse(BaseModel):
     single_part_transactions: int
@@ -18,7 +20,7 @@ class BlikMetricsResultResponse(BaseModel):
 
 
 class BlikMetricsStatusResponse(BaseModel):
-    status: str
+    status: JobStatus
     progress: str | None
     result: BlikMetricsResultResponse | None
     error: str | None

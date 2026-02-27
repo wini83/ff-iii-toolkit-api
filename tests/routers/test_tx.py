@@ -9,9 +9,10 @@ from api.models.tx import (
 )
 from api.routers.auth import create_access_token
 from services.db.repository import UserRepository
+from services.domain.job_base import JobStatus
 from services.domain.metrics import TXStatisticsMetrics
 from services.exceptions import ExternalServiceFailed
-from services.tx_stats.models import JobStatus, MetricsState
+from services.tx_stats.models import MetricsState
 
 
 def _auth_header(user_id: str) -> dict[str, str]:

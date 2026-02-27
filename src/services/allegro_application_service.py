@@ -12,10 +12,10 @@ from services.domain.allegro import (
     AllegroAccount,
     AllegroApplyJob,
     AllegroOrderPayment,
-    ApplyJobStatus,
     ApplyOutcome,
     MatchDecision,
 )
+from services.domain.job_base import JobStatus
 from services.domain.match_result import MatchResult
 from services.domain.metrics import AllegroMetrics
 from services.domain.transaction import Transaction, TxTag
@@ -158,7 +158,7 @@ class AllegroApplicationService:
         decisions: list[MatchDecision],
         matches: list[MatchResult],
     ):
-        job.status = ApplyJobStatus.RUNNING
+        job.status = JobStatus.RUNNING
 
         index = {int(cast(Transaction, m.tx).id): m for m in matches}
 
@@ -185,7 +185,7 @@ class AllegroApplicationService:
                     ApplyOutcome(transaction_id=tx_id, status="failed", reason=str(e))
                 )
 
-        job.status = ApplyJobStatus.DONE
+        job.status = JobStatus.DONE
         job.finished_at = datetime.now(UTC)
 
     async def start_auto_apply_single_matches(

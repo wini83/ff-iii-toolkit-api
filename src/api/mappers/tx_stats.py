@@ -1,3 +1,4 @@
+from api.mappers.job_status import map_status
 from api.models.tx_stats import (
     TxMetricsResultResponse,
     TxMetricsStatusResponse,
@@ -24,7 +25,7 @@ def map_tx_state_to_response(
         )
 
     return TxMetricsStatusResponse(
-        status=state.status.value,
+        status=map_status(state.status),
         progress=state.progress,
         result=result,
         error=state.error,

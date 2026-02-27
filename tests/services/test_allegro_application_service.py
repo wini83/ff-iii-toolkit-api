@@ -12,9 +12,9 @@ from services.allegro_state_store import AllegroStateStore
 from services.domain.allegro import (
     AllegroApplyJob,
     AllegroOrderPayment,
-    ApplyJobStatus,
     MatchDecision,
 )
+from services.domain.job_base import JobStatus
 from services.domain.match_result import MatchResult
 from services.domain.transaction import Currency, Transaction, TxTag, TxType
 from services.domain.user_secrets import SecretType
@@ -23,7 +23,7 @@ from services.exceptions import (
     InvalidSecretId,
     MatchesNotComputed,
 )
-from services.tx_stats.models import JobStatus, MetricsState
+from services.tx_stats.models import MetricsState
 
 
 @pytest.fixture(scope="module")
@@ -176,7 +176,7 @@ async def test_run_apply_job_counts_success_and_failures():
         id=uuid4(),
         secret_id=uuid4(),
         total=4,
-        status=ApplyJobStatus.PENDING,
+        status=JobStatus.PENDING,
     )
 
     decisions = [
@@ -191,7 +191,7 @@ async def test_run_apply_job_counts_success_and_failures():
     assert ff.apply_match.await_count == 2
     assert job.applied == 1
     assert job.failed == 3
-    assert job.status == ApplyJobStatus.DONE
+    assert job.status == JobStatus.DONE
     assert job.finished_at is not None
 
 
@@ -235,7 +235,7 @@ async def test_start_auto_apply_single_matches_builds_decisions_for_single_match
         id=uuid4(),
         secret_id=secret_id,
         total=len(expected_pairs),
-        status=ApplyJobStatus.PENDING,
+        status=JobStatus.PENDING,
     )
     service.start_apply_job = AsyncMock(return_value=job)
 

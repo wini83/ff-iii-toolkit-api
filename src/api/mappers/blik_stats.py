@@ -1,3 +1,4 @@
+from api.mappers.job_status import map_status
 from api.models.blik_stats import (
     BlikMetricsResultResponse,
     BlikMetricsStatusResponse,
@@ -24,7 +25,7 @@ def map_blik_metrics_state_to_response(
         )
 
     return BlikMetricsStatusResponse(
-        status=state.status.value,
+        status=map_status(state.status),
         progress=state.progress,
         result=result,
         error=state.error,

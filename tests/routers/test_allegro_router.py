@@ -7,7 +7,8 @@ import pytest
 from api.deps_runtime import get_allegro_application_runtime
 from api.routers.auth import create_access_token
 from services.db.repository import UserRepository
-from services.domain.allegro import AllegroApplyJob, ApplyJobStatus
+from services.domain.allegro import AllegroApplyJob
+from services.domain.job_base import JobStatus
 from services.exceptions import (
     ExternalServiceFailed,
     InvalidFileId,
@@ -80,7 +81,7 @@ def _job() -> AllegroApplyJob:
         id=uuid4(),
         secret_id=uuid4(),
         total=2,
-        status=ApplyJobStatus.DONE,
+        status=JobStatus.DONE,
         started_at=datetime.now(UTC),
         applied=1,
         failed=1,
@@ -224,7 +225,7 @@ def test_get_apply_job_returns_200_when_found(client, db):
 async def test_get_statistics_current_returns_mapped_state(client, db):
     user = _create_user(db, username=f"u-{uuid4()}")
     state = SimpleNamespace(
-        status=SimpleNamespace(value="pending"), progress="p", result=None, error=None
+        status=JobStatus.PENDING, progress="p", result=None, error=None
     )
     svc = FakeAllegroSvc(metrics_state=state)
     client.app.dependency_overrides[get_allegro_application_runtime] = lambda: svc
@@ -243,7 +244,7 @@ async def test_get_statistics_current_returns_mapped_state(client, db):
 async def test_refresh_statistics_current_returns_mapped_state(client, db):
     user = _create_user(db, username=f"u-{uuid4()}")
     state = SimpleNamespace(
-        status=SimpleNamespace(value="done"), progress=None, result=None, error=None
+        status=JobStatus.DONE, progress=None, result=None, error=None
     )
     svc = FakeAllegroSvc(refresh_metrics_state=state)
     client.app.dependency_overrides[get_allegro_application_runtime] = lambda: svc
