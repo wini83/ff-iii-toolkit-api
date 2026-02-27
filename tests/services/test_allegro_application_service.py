@@ -220,7 +220,10 @@ async def test_start_auto_apply_single_matches_builds_decisions_for_single_match
                 MatchResult(tx=_tx(1), matches=[_payment("single-1", "full-1")]),
                 MatchResult(
                     tx=_tx(2),
-                    matches=[_payment("multi-1", "full-2"), _payment("multi-2", "full-3")],
+                    matches=[
+                        _payment("multi-1", "full-2"),
+                        _payment("multi-2", "full-3"),
+                    ],
                 ),
                 MatchResult(tx=_tx(3), matches=[]),
                 MatchResult(tx=_tx(4), matches=[_payment("single-4", "full-4")]),

@@ -17,8 +17,8 @@ from api.models.allegro import ApplyDecision, ApplyPayload
 from services.domain.allegro import (
     AllegroApplyJob,
     AllegroOrderPayment,
-    ApplyOutcome,
     ApplyJobStatus,
+    ApplyOutcome,
 )
 from services.domain.match_result import MatchResult
 from services.domain.metrics import AllegroMetrics

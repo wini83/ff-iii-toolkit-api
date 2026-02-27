@@ -37,8 +37,9 @@ def get_version() -> str:
 
 
 def create_app(*, bootstrap: DatabaseBootstrap | None = None) -> FastAPI:
-    app = FastAPI(title="Firefly III Toolkit")
-    app.state.version = get_version()
+    version = get_version()
+    app = FastAPI(title="Firefly III Toolkit", version=version)
+    app.state.version = version
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):

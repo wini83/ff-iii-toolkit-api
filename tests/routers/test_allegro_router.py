@@ -223,7 +223,9 @@ def test_get_apply_job_returns_200_when_found(client, db):
 @pytest.mark.anyio
 async def test_get_statistics_current_returns_mapped_state(client, db):
     user = _create_user(db, username=f"u-{uuid4()}")
-    state = SimpleNamespace(status=SimpleNamespace(value="pending"), progress="p", result=None, error=None)
+    state = SimpleNamespace(
+        status=SimpleNamespace(value="pending"), progress="p", result=None, error=None
+    )
     svc = FakeAllegroSvc(metrics_state=state)
     client.app.dependency_overrides[get_allegro_application_runtime] = lambda: svc
 
@@ -240,7 +242,9 @@ async def test_get_statistics_current_returns_mapped_state(client, db):
 @pytest.mark.anyio
 async def test_refresh_statistics_current_returns_mapped_state(client, db):
     user = _create_user(db, username=f"u-{uuid4()}")
-    state = SimpleNamespace(status=SimpleNamespace(value="done"), progress=None, result=None, error=None)
+    state = SimpleNamespace(
+        status=SimpleNamespace(value="done"), progress=None, result=None, error=None
+    )
     svc = FakeAllegroSvc(refresh_metrics_state=state)
     client.app.dependency_overrides[get_allegro_application_runtime] = lambda: svc
 
