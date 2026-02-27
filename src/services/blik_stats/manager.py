@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import asyncio
 
+from services.domain.job_base import JobStatus
 from services.domain.metrics import BlikStatisticsMetrics
 from services.firefly_blik_service import FireflyBlikService
-from services.tx_stats.models import JobStatus, MetricsState
+from services.tx_stats.models import MetricsState
 from services.tx_stats.runner import recompute_metrics
 
 

@@ -3,8 +3,9 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Protocol
 
+from services.domain.job_base import JobStatus
 from services.domain.metrics import BaseMetrics
-from services.tx_stats.models import JobStatus, MetricsState
+from services.tx_stats.models import MetricsState
 
 
 class MetricsProvider[T: BaseMetrics](Protocol):

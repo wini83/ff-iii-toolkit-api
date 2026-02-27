@@ -2,8 +2,9 @@ from datetime import datetime
 
 import pytest
 
+from services.domain.job_base import JobStatus
 from services.domain.metrics import BaseMetrics
-from services.tx_stats.models import JobStatus, MetricsState
+from services.tx_stats.models import MetricsState
 from services.tx_stats.runner import recompute_metrics
 
 

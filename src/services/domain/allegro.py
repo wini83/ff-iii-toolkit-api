@@ -1,10 +1,10 @@
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from enum import Enum
 from typing import Literal
 from uuid import UUID
 
 from services.allegro.get_order_result import Payment as allegro_payment
+from services.domain.job_base import JobStatus
 from services.domain.order_payment import OrderPayment
 from services.domain.transaction import TxTag
 
@@ -62,13 +62,6 @@ class MatchDecision:
     strategy: Literal["auto", "manual", "force"] = "auto"
 
 
-class ApplyJobStatus(str, Enum):
-    PENDING = "pending"
-    RUNNING = "running"
-    DONE = "done"
-    FAILED = "failed"
-
-
 @dataclass(slots=True)
 class ApplyOutcome:
     transaction_id: int
@@ -81,7 +74,7 @@ class AllegroApplyJob:
     id: UUID
     secret_id: UUID
     total: int
-    status: ApplyJobStatus
+    status: JobStatus
     started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     applied: int = 0
     failed: int = 0

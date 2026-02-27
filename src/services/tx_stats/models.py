@@ -2,16 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
 
+from services.domain.job_base import JobStatus
 from services.domain.metrics import BaseMetrics
-
-
-class JobStatus(str, Enum):
-    PENDING = "pending"
-    RUNNING = "running"
-    DONE = "done"
-    FAILED = "failed"
 
 
 @dataclass(slots=True)

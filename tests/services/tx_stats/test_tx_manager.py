@@ -3,8 +3,8 @@ from unittest.mock import MagicMock
 import pytest
 
 import services.tx_stats.manager as manager_module
+from services.domain.job_base import JobStatus
 from services.tx_stats.manager import TxMetricsManager
-from services.tx_stats.models import JobStatus
 
 
 @pytest.fixture(scope="module")

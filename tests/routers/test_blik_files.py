@@ -14,9 +14,10 @@ from api.models.blik_files import (
 from api.models.tx import SimplifiedTx
 from api.routers.auth import create_access_token
 from services.db.repository import UserRepository
+from services.domain.job_base import JobStatus
 from services.domain.metrics import BlikStatisticsMetrics
 from services.exceptions import FileNotFound, InvalidFileId
-from services.tx_stats.models import JobStatus, MetricsState
+from services.tx_stats.models import MetricsState
 
 
 def _auth_header(user_id: str) -> dict[str, str]:

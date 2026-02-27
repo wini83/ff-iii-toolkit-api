@@ -2,6 +2,8 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+from api.models.job_base import JobStatus
+
 
 class RunResponse(BaseModel):
     job_id: str
@@ -20,7 +22,7 @@ class TxMetricsResultResponse(BaseModel):
 
 
 class TxMetricsStatusResponse(BaseModel):
-    status: str
+    status: JobStatus
     progress: str | None
     result: TxMetricsResultResponse | None
     error: str | None

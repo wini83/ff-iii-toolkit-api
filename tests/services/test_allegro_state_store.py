@@ -6,7 +6,7 @@ from services.allegro_state_store import (
     AllegroStateStore,
     get_allegro_state_store,
 )
-from services.domain.allegro import ApplyJobStatus
+from services.domain.job_base import JobStatus
 
 
 def test_apply_job_manager_create_and_get():
@@ -17,7 +17,7 @@ def test_apply_job_manager_create_and_get():
 
     assert job.secret_id == secret_id
     assert job.total == 5
-    assert job.status == ApplyJobStatus.PENDING
+    assert job.status == JobStatus.PENDING
     assert isinstance(job.started_at, datetime)
     assert job.started_at.tzinfo is not None
 
