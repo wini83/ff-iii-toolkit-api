@@ -128,6 +128,17 @@
 - **api**: - extract upload and file endpoints into separate routers - move csv parsing and transaction processing to services/ - add centralized logging and encoding utilities - introduce config module for env settings - create clean app entrypoint with router registration - improve project structure for scalability and maintainability
 - **all**: black isort ruff
 
+## v2.6.0b2 (2026-02-27)
+
+### Fix
+
+- recover version display in swagger docs
+
+### Refactor
+
+- **allegro**: add auto-apply endpoint and detailed apply job outcomes
+- **allegro**: add auto-apply for single matches and track apply job tx results
+
 ## v2.6.0b1 (2026-02-27)
 
 ### Feat
