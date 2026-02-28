@@ -19,6 +19,7 @@ async def recompute_metrics[T: BaseMetrics](
     state.status = JobStatus.RUNNING
     state.progress = "fetching"
     state.error = None
+    state.result = None
     try:
         result = await provider.fetch_metrics()
         state.result = result
@@ -29,3 +30,4 @@ async def recompute_metrics[T: BaseMetrics](
         state.status = JobStatus.FAILED
         state.error = str(exc)
         state.progress = None
+        state.result = None

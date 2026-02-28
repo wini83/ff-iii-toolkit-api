@@ -28,9 +28,10 @@ class TxMetricsManager:
             if self._state.status == JobStatus.RUNNING:
                 return self._state
 
-            # only progress changes here; status is owned by runner
+            self._state.status = JobStatus.RUNNING
             self._state.progress = "queued"
             self._state.error = None
+            self._state.result = None
 
             asyncio.create_task(recompute_metrics(self._state, self._tx_service))
 

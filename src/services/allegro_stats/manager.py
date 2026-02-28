@@ -27,9 +27,10 @@ class AllegroMetricsManager:
         async with self._lock:
             if self._state.status == JobStatus.RUNNING:
                 return self._state
-
+            self._state.status = JobStatus.RUNNING
             self._state.progress = "queued"
             self._state.error = None
+            self._state.result = None
 
             asyncio.create_task(
                 recompute_metrics(self._state, self._ff_allegro_service)
