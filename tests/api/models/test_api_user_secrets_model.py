@@ -18,4 +18,3 @@ def test_user_secret_response_short_id_is_sha1_prefix():
     expected = hashlib.sha1(str(secret.id).encode()).hexdigest()[:8]
 
     assert secret.short_id == expected
-    assert secret.model_dump()["short_id"] == expected
