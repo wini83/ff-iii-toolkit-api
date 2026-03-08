@@ -5,6 +5,7 @@ from uuid import UUID
 
 from services.allegro.get_order_result import Payment as allegro_payment
 from services.domain.job_base import JobStatus
+from services.domain.match_result import MatchResult
 from services.domain.order_payment import OrderPayment
 from services.domain.transaction import TxTag
 
@@ -53,6 +54,27 @@ class AllegroOrderPayments:
     """Collection of Allegro order payments."""
 
     payments: list[AllegroOrderPayment]
+
+
+@dataclass(frozen=True, slots=True)
+class AllegroPageRequest:
+    limit: int = 25
+    offset: int = 0
+
+    def __post_init__(self) -> None:
+        if self.limit <= 0:
+            raise ValueError("limit must be greater than 0")
+        if self.offset < 0:
+            raise ValueError("offset must be greater than or equal to 0")
+
+
+@dataclass(slots=True)
+class AllegroPageMatchCacheEntry:
+    page: AllegroPageRequest
+    login: str
+    payments: list[AllegroOrderPayment]
+    matches: list[MatchResult]
+    fetched_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass

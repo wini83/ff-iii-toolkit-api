@@ -31,7 +31,12 @@ class AllegroService:
 
         return client
 
-    def fetch(self, account: AllegroAccount) -> AllegroOrderPayments:
+    def fetch(
+        self,
+        account: AllegroAccount,
+        limit: int = 25,
+        offset: int = 0,
+    ) -> AllegroOrderPayments:
         client = self._client_for(account)
 
         try:
@@ -39,7 +44,7 @@ class AllegroService:
                 info = client.get_user_info()
                 account = replace(account, login=info.login)
 
-            raw = client.get_orders()
+            raw = client.get_orders(limit=limit, offset=offset)
             payments = [
                 AllegroOrderPayment.from_allegro_payment(p, account.login or "unknown")
                 for p in raw.payments
@@ -49,34 +54,6 @@ class AllegroService:
 
         except Exception as exc:
             raise self._wrap_error(exc) from exc
-
-    def batch_fetch(self, accounts: list[AllegroAccount]) -> AllegroOrderPayments:
-        payments: list[AllegroOrderPayment] = []
-        enriched_accounts: list[AllegroAccount] = []
-
-        for account in accounts:
-            client = self._client_for(account)
-
-            try:
-                if account.login is None:
-                    info = client.get_user_info()
-                    account = replace(account, login=info.login)
-
-                enriched_accounts.append(account)
-
-                raw = client.get_orders()
-                payments.extend(
-                    AllegroOrderPayment.from_allegro_payment(
-                        p, account.login or "unknown"
-                    )
-                    for p in raw.payments
-                )
-
-            except Exception as exc:
-                raise self._wrap_error(exc) from exc
-
-        self._accounts = enriched_accounts
-        return AllegroOrderPayments(payments=payments)
 
     # --------------------------------------------------
     # Error mapping

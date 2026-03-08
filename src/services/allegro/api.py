@@ -37,11 +37,13 @@ class AllegroApiClient:
             "Referer": "https://allegro.pl/",
         }
 
-    def get_orders(self) -> GetOrdersResult:
+    def get_orders(self, limit: int = 25, offset: int = 0) -> GetOrdersResult:
         """Get orders from API."""
+        if limit <= 0 or offset < 0:
+            raise ValueError("Limit & Offset must be greater than 0")
         headers = self.get_standard_header(3)
         get_orders_response = self._api_wrapper.get(
-            f"{ALLEGRO_API_URL}/myorder-api/myorders?limit=25",
+            f"{ALLEGRO_API_URL}/myorder-api/myorders?limit={limit}&offset={offset}",
             headers=headers,
         )
         return GetOrdersResult(get_orders_response)
