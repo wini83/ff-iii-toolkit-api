@@ -128,6 +128,20 @@
 - **api**: - extract upload and file endpoints into separate routers - move csv parsing and transaction processing to services/ - add centralized logging and encoding utilities - introduce config module for env settings - create clean app entrypoint with router registration - improve project structure for scalability and maintainability
 - **all**: black isort ruff
 
+## v2.6.0rc1 (2026-03-08)
+
+### Fix
+
+- **allegro**: add paginated match cache and cache invalidation endpoint
+- **allegro**: add paginated match cache and cache invalidation endpoint
+- **main**: align docs url to production stack
+
+### Refactor
+
+- **allegro**: remove batch fetch and support order pagination
+- **secrets**: added short id for secrets
+- unify job status enums across domain, stats, and API layers
+
 ## v2.6.0rc0 (2026-02-28)
 
 ### Refactor
