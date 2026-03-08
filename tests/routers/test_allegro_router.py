@@ -55,6 +55,9 @@ class FakeAllegroSvc:
         self._auto_error = auto_error
         self._metrics_state = metrics_state
         self._refresh_metrics_state = refresh_metrics_state
+        self._cleared_secret = False
+        self._cleared_page = False
+        self._cleared_page_payload = None
         self.state_store = SimpleNamespace(
             job_manager=SimpleNamespace(get=lambda _job_id: lookup_job)
         )
@@ -74,6 +77,15 @@ class FakeAllegroSvc:
 
     async def refresh_metrics_state(self):
         return self._refresh_metrics_state
+
+    def clear_cached_secret(self, *, secret_id):
+        self._cleared_secret = True
+        return True
+
+    def clear_cached_page(self, *, secret_id, page):
+        self._cleared_page = True
+        self._cleared_page_payload = page
+        return True
 
 
 def _job() -> AllegroApplyJob:
@@ -256,3 +268,78 @@ async def test_refresh_statistics_current_returns_mapped_state(client, db):
 
     assert response.status_code == 200
     assert response.json()["status"] == "done"
+
+
+def test_clear_cache_for_secret_returns_scope_secret(client, db):
+    user = _create_user(db, username=f"u-{uuid4()}")
+    svc = FakeAllegroSvc()
+    client.app.dependency_overrides[get_allegro_application_runtime] = lambda: svc
+
+    response = client.delete(
+        f"/api/allegro/{uuid4()}/cache",
+        headers=_auth_header(str(user.id)),
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"scope": "secret", "cleared": True}
+    assert svc._cleared_secret is True
+
+
+def test_clear_cache_for_page_returns_scope_page(client, db):
+    user = _create_user(db, username=f"u-{uuid4()}")
+    svc = FakeAllegroSvc()
+    client.app.dependency_overrides[get_allegro_application_runtime] = lambda: svc
+
+    response = client.delete(
+        f"/api/allegro/{uuid4()}/cache?limit=25&offset=50",
+        headers=_auth_header(str(user.id)),
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "scope": "page",
+        "cleared": True,
+        "limit": 25,
+        "offset": 50,
+    }
+    assert svc._cleared_page is True
+    assert svc._cleared_page_payload.limit == 25
+    assert svc._cleared_page_payload.offset == 50
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "?limit=25",
+        "?offset=0",
+    ],
+)
+def test_clear_cache_requires_limit_and_offset_pair(client, db, query):
+    user = _create_user(db, username=f"u-{uuid4()}")
+    svc = FakeAllegroSvc()
+    client.app.dependency_overrides[get_allegro_application_runtime] = lambda: svc
+
+    response = client.delete(
+        f"/api/allegro/{uuid4()}/cache{query}",
+        headers=_auth_header(str(user.id)),
+    )
+
+    assert response.status_code == 400
+    assert (
+        response.json()["detail"]
+        == "Provide both limit and offset to clear a single page cache"
+    )
+
+
+def test_clear_cache_invalid_secret_id_returns_400(client, db):
+    user = _create_user(db, username=f"u-{uuid4()}")
+    svc = FakeAllegroSvc()
+    client.app.dependency_overrides[get_allegro_application_runtime] = lambda: svc
+
+    response = client.delete(
+        "/api/allegro/not-a-uuid/cache",
+        headers=_auth_header(str(user.id)),
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid secret_id"

@@ -19,10 +19,12 @@ from api.models.allegro import (
 )
 from api.models.user_secrets import UserSecretResponse
 from services.allegro_application_service import AllegroApplicationService
+from services.domain.allegro import AllegroPageRequest
 from services.exceptions import (
     ExternalServiceFailed,
     InvalidFileId,
     InvalidMatchSelection,
+    InvalidSecretId,
     MatchesNotComputed,
     TransactionNotFound,
 )
@@ -52,21 +54,51 @@ def list_secrets(
 @router.get("/{secret_id}/payments", response_model=list[AllegroPayment])
 def fetch_for_id(
     secret_id: str,
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user_id: UUID = Depends(require_active_user),
     svc: AllegroApplicationService = Depends(get_allegro_application_runtime),
 ):
-    payments = svc.fetch_allegro_data(user_id=user_id, secret_id=UUID(secret_id))
-    return map_allegro_payments_to_response(payments)
+    page = AllegroPageRequest(limit=limit, offset=offset)
+    try:
+        payments = svc.fetch_allegro_data(
+            user_id=user_id,
+            secret_id=UUID(secret_id),
+            page=page,
+        )
+        return map_allegro_payments_to_response(payments)
+    except InvalidSecretId as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except ExternalServiceFailed as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
 
 
 @router.get("/{secret_id}/matches", response_model=AllegroMatchResponse)
 async def preview_matches(
     secret_id: str,
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user_id: UUID = Depends(require_active_user),
     svc: AllegroApplicationService = Depends(get_allegro_application_runtime),
 ):
-    data = await svc.preview_matches(user_id=user_id, secret_id=UUID(secret_id))
-    return data
+    page = AllegroPageRequest(limit=limit, offset=offset)
+    try:
+        data = await svc.preview_matches(
+            user_id=user_id,
+            secret_id=UUID(secret_id),
+            page=page,
+        )
+        return data
+    except InvalidSecretId as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except MatchesNotComputed as e:
+        raise HTTPException(status_code=400, detail="No match data found") from e
+    except TransactionNotFound as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except InvalidMatchSelection as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except ExternalServiceFailed as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
 
 
 @router.post("/{secret_id}/apply", response_model=ApplyJobResponse)
@@ -80,6 +112,8 @@ async def apply_matches(
             secret_id=UUID(secret_id), decisions=map_payload_to_decisions(payload)
         )
         return map_job_to_response(job)
+    except InvalidSecretId as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except InvalidFileId as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except MatchesNotComputed as e:
@@ -125,6 +159,44 @@ async def auto_apply_single_matches(
     except ValueError as e:
         # UUID(secret_id) parsing error
         raise HTTPException(status_code=400, detail="Invalid secret_id") from e
+
+
+@router.delete("/{secret_id}/cache")
+def clear_cache_for_secret(
+    secret_id: str,
+    limit: int | None = Query(default=None, ge=1, le=100),
+    offset: int | None = Query(default=None, ge=0),
+    svc: AllegroApplicationService = Depends(get_allegro_application_runtime),
+):
+    if (limit is None) != (offset is None):
+        raise HTTPException(
+            status_code=400,
+            detail="Provide both limit and offset to clear a single page cache",
+        )
+
+    try:
+        secret_uuid = UUID(secret_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="Invalid secret_id") from e
+
+    if limit is None and offset is None:
+        cleared = svc.clear_cached_secret(secret_id=secret_uuid)
+        return {"scope": "secret", "cleared": cleared}
+
+    if limit is None:
+        limit = 25
+
+    if offset is None:
+        offset = 0
+
+    page = AllegroPageRequest(limit=limit, offset=offset)
+    cleared = svc.clear_cached_page(secret_id=secret_uuid, page=page)
+    return {
+        "scope": "page",
+        "cleared": cleared,
+        "limit": page.limit,
+        "offset": page.offset,
+    }
 
 
 @router.get("/apply-jobs/{job_id}", response_model=ApplyJobResponse)

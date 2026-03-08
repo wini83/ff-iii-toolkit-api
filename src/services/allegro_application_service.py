@@ -12,6 +12,9 @@ from services.domain.allegro import (
     AllegroAccount,
     AllegroApplyJob,
     AllegroOrderPayment,
+    AllegroOrderPayments,
+    AllegroPageMatchCacheEntry,
+    AllegroPageRequest,
     ApplyOutcome,
     MatchDecision,
 )
@@ -57,7 +60,13 @@ class AllegroApplicationService:
         ]
         return allegro_secrets
 
-    def fetch_allegro_data(self, user_id: UUID, secret_id: UUID):
+    def fetch_allegro_data(
+        self,
+        *,
+        user_id: UUID,
+        secret_id: UUID,
+        page: AllegroPageRequest,
+    ) -> AllegroOrderPayments:
         try:
             secret = self.secrets_service.get_for_internal_use(
                 secret_id=secret_id, user_id=user_id
@@ -68,32 +77,71 @@ class AllegroApplicationService:
             ) from e
         account = AllegroAccount(secret=secret.secret, id=secret.id)
         try:
-            data = self.allegro_service.fetch(account=account)
+            data = self.allegro_service.fetch(
+                account=account,
+                limit=page.limit,
+                offset=page.offset,
+            )
             return data
         except Exception as e:
             raise ExternalServiceFailed(
                 f"Failed to fetch allegro data for secret {secret_id}"
             ) from e
 
-    async def preview_matches(
-        self, user_id: UUID, secret_id: UUID
-    ) -> AllegroMatchResponse:
-        payments = self.fetch_allegro_data(user_id=user_id, secret_id=secret_id)
+    async def _match_page(
+        self, *, payments: list[AllegroOrderPayment]
+    ) -> list[MatchResult]:
         try:
-            matches = await self.ff_allegro_service.match(
+            return await self.ff_allegro_service.match(
                 filter_text=self.ff_allegro_service.filter_desc_allegro,
                 tag_done=TxTag.allegro_done,
-                candidates=payments.payments,
+                candidates=payments,
             )
         except FireflyServiceError as e:
             raise ExternalServiceFailed(str(e)) from e
 
-        if len(payments.payments) != 0:
-            login = payments.payments[0].allegro_login
-        else:
-            login = "unknown"
+    def _cache_page(
+        self,
+        *,
+        secret_id: UUID,
+        page: AllegroPageRequest,
+        payments: list[AllegroOrderPayment],
+        matches: list[MatchResult],
+    ) -> None:
+        login = payments[0].allegro_login if payments else "unknown"
+        self.state_store.put_page_matches(
+            secret_id=secret_id,
+            entry=AllegroPageMatchCacheEntry(
+                page=page,
+                login=login,
+                payments=payments,
+                matches=matches,
+            ),
+        )
 
-        self.state_store.matches_cache[str(secret_id)] = matches
+    async def preview_matches(
+        self,
+        *,
+        user_id: UUID,
+        secret_id: UUID,
+        page: AllegroPageRequest | None = None,
+    ) -> AllegroMatchResponse:
+        page_request = page or AllegroPageRequest()
+        payments = self.fetch_allegro_data(
+            user_id=user_id,
+            secret_id=secret_id,
+            page=page_request,
+        )
+
+        matches = await self._match_page(payments=payments.payments)
+        self._cache_page(
+            secret_id=secret_id,
+            page=page_request,
+            payments=payments.payments,
+            matches=matches,
+        )
+
+        login = payments.payments[0].allegro_login if payments.payments else "unknown"
         not_matched = len([r for r in matches if not r.matches])
         with_one_match = len([r for r in matches if len(r.matches) == 1])
         with_many_matches = len([r for r in matches if len(r.matches) > 1])
@@ -115,7 +163,7 @@ class AllegroApplicationService:
         secret_id: UUID,
         decisions: list[MatchDecision],
     ) -> AllegroApplyJob:
-        matches = self.state_store.matches_cache.get(str(secret_id))
+        matches = self.state_store.get_all_matches(secret_id=secret_id)
         if not matches:
             raise MatchesNotComputed()
 
@@ -184,7 +232,7 @@ class AllegroApplicationService:
         secret_id: UUID,
         limit: int | None = None,
     ) -> AllegroApplyJob:
-        matches = self.state_store.matches_cache.get(str(secret_id))
+        matches = self.state_store.get_all_matches(secret_id=secret_id)
         if not matches:
             raise MatchesNotComputed()
         single = [m for m in matches if len(m.matches) == 1]
@@ -204,6 +252,12 @@ class AllegroApplicationService:
             secret_id=secret_id,
             decisions=decisions,
         )
+
+    def clear_cached_page(self, *, secret_id: UUID, page: AllegroPageRequest) -> bool:
+        return self.state_store.invalidate_page(secret_id=secret_id, page=page)
+
+    def clear_cached_secret(self, *, secret_id: UUID) -> bool:
+        return self.state_store.invalidate_secret(secret_id=secret_id)
 
     # --------------------------------------------------
     # METRICS V2
