@@ -67,6 +67,8 @@ def fetch_for_id(
             page=page,
         )
         return map_allegro_payments_to_response(payments)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="Invalid secret_id") from e
     except InvalidSecretId as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except ExternalServiceFailed as e:
@@ -89,6 +91,8 @@ async def preview_matches(
             page=page,
         )
         return data
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="Invalid secret_id") from e
     except InvalidSecretId as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except MatchesNotComputed as e:
@@ -112,6 +116,8 @@ async def apply_matches(
             secret_id=UUID(secret_id), decisions=map_payload_to_decisions(payload)
         )
         return map_job_to_response(job)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="Invalid secret_id") from e
     except InvalidSecretId as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except InvalidFileId as e:
@@ -183,12 +189,7 @@ def clear_cache_for_secret(
         cleared = svc.clear_cached_secret(secret_id=secret_uuid)
         return {"scope": "secret", "cleared": cleared}
 
-    if limit is None:
-        limit = 25
-
-    if offset is None:
-        offset = 0
-
+    assert limit is not None and offset is not None
     page = AllegroPageRequest(limit=limit, offset=offset)
     cleared = svc.clear_cached_page(secret_id=secret_uuid, page=page)
     return {

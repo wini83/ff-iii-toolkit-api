@@ -126,3 +126,41 @@ def test_invalidate_secret_and_all():
 
     store.invalidate_all()
     assert store.page_matches_cache == {}
+
+
+def test_invalidate_page_returns_false_for_missing_secret_or_page():
+    store = AllegroStateStore()
+    secret_id = uuid4()
+    page = AllegroPageRequest(limit=25, offset=0)
+
+    assert store.invalidate_page(secret_id=secret_id, page=page) is False
+
+    store.put_page_matches(
+        secret_id=secret_id,
+        entry=AllegroPageMatchCacheEntry(page=page, login="a", payments=[], matches=[]),
+    )
+
+    assert (
+        store.invalidate_page(
+            secret_id=secret_id, page=AllegroPageRequest(limit=25, offset=25)
+        )
+        is False
+    )
+
+
+def test_invalidate_page_removes_secret_bucket_when_last_page_removed():
+    store = AllegroStateStore()
+    secret_id = uuid4()
+    page = AllegroPageRequest(limit=25, offset=0)
+    store.put_page_matches(
+        secret_id=secret_id,
+        entry=AllegroPageMatchCacheEntry(page=page, login="a", payments=[], matches=[]),
+    )
+
+    assert store.invalidate_page(secret_id=secret_id, page=page) is True
+    assert str(secret_id) not in store.page_matches_cache
+
+
+def test_invalidate_secret_returns_false_when_missing():
+    store = AllegroStateStore()
+    assert store.invalidate_secret(secret_id=uuid4()) is False
