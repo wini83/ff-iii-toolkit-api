@@ -106,62 +106,6 @@ def test_fetch_reraises_unknown_error():
         svc.fetch(account)
 
 
-def test_batch_fetch_combines_and_enriches(monkeypatch):
-    client1 = MagicMock()
-    client1.get_user_info.return_value = DummyInfo("u1")
-    client1.get_orders.return_value = DummyOrders(payments=["p1"])
-
-    client2 = MagicMock()
-    client2.get_orders.return_value = DummyOrders(payments=["p2", "p3"])
-
-    factory = MagicMock(side_effect=[client1, client2])
-    svc = AllegroService(client_factory=factory)
-
-    mapped = [object(), object(), object()]
-    mapper = MagicMock(side_effect=mapped)
-    monkeypatch.setattr(AllegroOrderPayment, "from_allegro_payment", mapper)
-
-    accounts = [
-        AllegroAccount(id=uuid4(), secret="s1", login=None),
-        AllegroAccount(id=uuid4(), secret="s2", login="u2"),
-    ]
-
-    result = svc.batch_fetch(accounts)
-
-    assert result.payments == mapped
-    client1.get_user_info.assert_called_once()
-    client2.get_user_info.assert_not_called()
-    mapper.assert_any_call("p1", "u1")
-    mapper.assert_any_call("p2", "u2")
-    mapper.assert_any_call("p3", "u2")
-
-
-def test_batch_fetch_wraps_api_error(monkeypatch):
-    client1 = MagicMock()
-    client1.get_orders.return_value = DummyOrders(payments=["p1"])
-
-    client2 = MagicMock()
-    client2.get_orders.side_effect = AllegroApiError("bad")
-
-    factory = MagicMock(side_effect=[client1, client2])
-    svc = AllegroService(client_factory=factory)
-
-    accounts = [
-        AllegroAccount(id=uuid4(), secret="s1", login="u1"),
-        AllegroAccount(id=uuid4(), secret="s2", login="u2"),
-    ]
-
-    monkeypatch.setattr(
-        AllegroOrderPayment, "from_allegro_payment", MagicMock(return_value=object())
-    )
-
-    with pytest.raises(AllegroServiceError) as exc:
-        svc.batch_fetch(accounts)
-
-    assert "api" in str(exc.value).lower()
-    assert exc.value.details == {"error": "bad"}
-
-
 def test_allegro_client_factory_uses_secret_and_session(monkeypatch):
     captured = {}
 

@@ -57,16 +57,6 @@ class AllegroApplicationService:
         ]
         return allegro_secrets
 
-    def batch_fetch_allegro_data(self, user_id: UUID, secrets_ids: list[UUID]):
-        accounts: list[AllegroAccount] = []
-        for secret_id in secrets_ids:
-            secret = self.secrets_service.get_for_internal_use(
-                secret_id=secret_id, user_id=user_id
-            )
-            accounts.append(AllegroAccount(secret=secret.secret, id=secret.id))
-
-        return self.allegro_service.batch_fetch(accounts=accounts)
-
     def fetch_allegro_data(self, user_id: UUID, secret_id: UUID):
         try:
             secret = self.secrets_service.get_for_internal_use(
