@@ -7,7 +7,7 @@ import pytest
 from api.deps_runtime import get_allegro_application_runtime
 from api.routers.auth import create_access_token
 from services.db.repository import UserRepository
-from services.domain.allegro import AllegroApplyJob
+from services.domain.allegro import AllegroApplyJob, AllegroMatchPreview
 from services.domain.job_base import JobStatus
 from services.exceptions import (
     ExternalServiceFailed,
@@ -221,16 +221,17 @@ def test_fetch_for_id_invalid_secret_id_returns_400(client, db):
 )
 async def test_preview_matches_maps_all_errors(client, db, error, status, detail):
     user = _create_user(db, username=f"u-{uuid4()}")
-    data = {
-        "login": "unknown",
-        "payments_fetched": 0,
-        "transactions_found": 0,
-        "transactions_not_matched": 0,
-        "transactions_with_one_match": 0,
-        "transactions_with_many_matches": 0,
-        "fetch_seconds": 0.01,
-        "content": [],
-    }
+    data = AllegroMatchPreview(
+        login="unknown",
+        payments_fetched=0,
+        transactions_found=0,
+        transactions_not_matched=0,
+        transactions_with_one_match=0,
+        transactions_with_many_matches=0,
+        fetch_seconds=0.01,
+        content=[],
+        unmatched_payments=[],
+    )
     svc = FakeAllegroSvc(matches=data, matches_error=error)
     client.app.dependency_overrides[get_allegro_application_runtime] = lambda: svc
 
@@ -242,6 +243,7 @@ async def test_preview_matches_maps_all_errors(client, db, error, status, detail
     assert response.status_code == status
     if status == 200:
         assert response.json()["content"] == []
+        assert response.json()["unmatched_payments"] == []
     else:
         assert response.json()["detail"] == detail
 
