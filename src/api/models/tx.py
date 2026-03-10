@@ -50,3 +50,8 @@ class TxTag(str, Enum):
     allegro_done = "allegro_done"
     rule_p = "rule_potential"
     action_req = "action_req"
+
+
+class MatchProcessingStatus(str, Enum):
+    NEW = "new"
+    ALREADY_PROCESSED = "already_processed"

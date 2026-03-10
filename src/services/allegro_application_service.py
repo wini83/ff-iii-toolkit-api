@@ -3,14 +3,13 @@ from datetime import UTC, datetime
 from typing import cast
 from uuid import UUID
 
-from api.mappers.allegro import map_match_result_to_api
-from api.models.allegro import AllegroMatchResponse
 from services.allegro_service import AllegroService
 from services.allegro_state_store import AllegroStateStore
 from services.allegro_stats.manager import AllegroMetricsManager
 from services.domain.allegro import (
     AllegroAccount,
     AllegroApplyJob,
+    AllegroMatchPreview,
     AllegroOrderPayment,
     AllegroOrderPayments,
     AllegroPageMatchCacheEntry,
@@ -90,13 +89,15 @@ class AllegroApplicationService:
 
     async def _match_page(
         self, *, payments: list[AllegroOrderPayment]
-    ) -> list[MatchResult]:
+    ) -> tuple[list[MatchResult], list[AllegroOrderPayment]]:
         try:
-            return await self.ff_allegro_service.match(
+            matches, unmatched = await self.ff_allegro_service.match_with_unmatched(
                 filter_text=self.ff_allegro_service.filter_desc_allegro,
                 tag_done=TxTag.allegro_done,
                 candidates=payments,
             )
+            unmatched_payments = [cast(AllegroOrderPayment, item) for item in unmatched]
+            return matches, unmatched_payments
         except FireflyServiceError as e:
             raise ExternalServiceFailed(str(e)) from e
 
@@ -125,7 +126,7 @@ class AllegroApplicationService:
         user_id: UUID,
         secret_id: UUID,
         page: AllegroPageRequest | None = None,
-    ) -> AllegroMatchResponse:
+    ) -> AllegroMatchPreview:
         page_request = page or AllegroPageRequest()
         payments = self.fetch_allegro_data(
             user_id=user_id,
@@ -133,7 +134,7 @@ class AllegroApplicationService:
             page=page_request,
         )
 
-        matches = await self._match_page(payments=payments.payments)
+        matches, unmatched_payments = await self._match_page(payments=payments.payments)
         self._cache_page(
             secret_id=secret_id,
             page=page_request,
@@ -146,7 +147,7 @@ class AllegroApplicationService:
         with_one_match = len([r for r in matches if len(r.matches) == 1])
         with_many_matches = len([r for r in matches if len(r.matches) > 1])
 
-        return AllegroMatchResponse(
+        return AllegroMatchPreview(
             login=login,
             payments_fetched=len(payments.payments),
             transactions_found=len(matches),
@@ -154,7 +155,8 @@ class AllegroApplicationService:
             transactions_with_one_match=with_one_match,
             transactions_with_many_matches=with_many_matches,
             fetch_seconds=0.0,  # TODO: measure time taken for matching
-            content=[map_match_result_to_api(r) for r in matches],
+            content=matches,
+            unmatched_payments=unmatched_payments,
         )
 
     async def start_apply_job(

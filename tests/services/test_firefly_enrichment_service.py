@@ -1,5 +1,5 @@
 import asyncio
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
@@ -12,6 +12,7 @@ from services.domain.transaction import (
     TxType,
 )
 from services.firefly_enrichment_service import FireflyEnrichmentService
+from settings import settings
 
 DEFAULT_CURRENCY = Currency(code="PLN", symbol="zl", decimals=2)
 
@@ -70,14 +71,17 @@ def test_match_filters_and_does_not_update_transactions():
 
     service.fetch_transactions.assert_awaited_once_with(
         start_date=date(2024, 1, 5),
-        end_date=date(2024, 1, 5),
-        exclude_categorized=True,
+        end_date=date(2024, 1, 5)
+        + timedelta(days=settings.MATCH_WITH_UNMATCHED_FUTURE_DAYS),
+        exclude_categorized=False,
     )
     service.update_transaction.assert_not_awaited()
 
-    assert len(results) == 1
+    assert len(results) == 2
     assert results[0].tx is tx_match
     assert results[0].matches == [record]
+    assert results[1].tx is tx_tagged
+    assert results[1].matches == [record]
 
 
 def test_apply_match_calls_update_transaction():

@@ -16,7 +16,7 @@ from services.domain.allegro import (
     MatchDecision,
 )
 from services.domain.job_base import JobStatus
-from services.domain.match_result import MatchResult
+from services.domain.match_result import MatchProcessingStatus, MatchResult
 from services.domain.transaction import Currency, Transaction, TxTag, TxType
 from services.domain.user_secrets import SecretType
 from services.exceptions import (
@@ -112,14 +112,45 @@ async def test_preview_matches_uses_unknown_login_for_empty_payments():
     secret_id = uuid4()
     page = AllegroPageRequest(limit=10, offset=20)
     service.fetch_allegro_data = MagicMock(return_value=SimpleNamespace(payments=[]))
-    service.ff_allegro_service.match = AsyncMock(return_value=[])
+    service.ff_allegro_service.match_with_unmatched = AsyncMock(return_value=([], []))
 
     result = await service.preview_matches(
         user_id=uuid4(), secret_id=secret_id, page=page
     )
 
     assert result.login == "unknown"
+    assert result.unmatched_payments == []
     assert service.state_store.get_page_matches(secret_id=secret_id, page=page) == []
+
+
+@pytest.mark.anyio
+async def test_preview_matches_returns_unmatched_payments():
+    service = _service()
+    secret_id = uuid4()
+    page = AllegroPageRequest(limit=10, offset=0)
+    matched_payment = _payment("p-1", "full-1")
+    unmatched_payment = _payment("p-2", "full-2")
+    service.fetch_allegro_data = MagicMock(
+        return_value=SimpleNamespace(payments=[matched_payment, unmatched_payment])
+    )
+    service.ff_allegro_service.match_with_unmatched = AsyncMock(
+        return_value=(
+            [
+                MatchResult(
+                    tx=_tx(1),
+                    matches=[matched_payment],
+                    status=MatchProcessingStatus.NEW,
+                )
+            ],
+            [unmatched_payment],
+        )
+    )
+
+    result = await service.preview_matches(
+        user_id=uuid4(), secret_id=secret_id, page=page
+    )
+
+    assert result.unmatched_payments == [unmatched_payment]
 
 
 @pytest.mark.anyio
@@ -140,7 +171,9 @@ async def test_start_apply_job_creates_job_and_schedules_task(monkeypatch):
             page=AllegroPageRequest(limit=25, offset=0),
             login="u1",
             payments=[],
-            matches=[MatchResult(tx=_tx(1), matches=[])],
+            matches=[
+                MatchResult(tx=_tx(1), matches=[], status=MatchProcessingStatus.NEW)
+            ],
         ),
     )
     service = _service(store)
@@ -187,8 +220,8 @@ async def test_run_apply_job_counts_success_and_failures():
     pay2 = _payment("ok-2", "full-2")
 
     matches = [
-        MatchResult(tx=tx1, matches=[pay1]),
-        MatchResult(tx=tx2, matches=[pay2]),
+        MatchResult(tx=tx1, matches=[pay1], status=MatchProcessingStatus.NEW),
+        MatchResult(tx=tx2, matches=[pay2], status=MatchProcessingStatus.NEW),
     ]
 
     job = AllegroApplyJob(
@@ -241,13 +274,18 @@ async def test_start_auto_apply_single_matches_builds_decisions_for_single_match
             login="u1",
             payments=[],
             matches=[
-                MatchResult(tx=_tx(1), matches=[_payment("single-1", "full-1")]),
+                MatchResult(
+                    tx=_tx(1),
+                    matches=[_payment("single-1", "full-1")],
+                    status=MatchProcessingStatus.NEW,
+                ),
                 MatchResult(
                     tx=_tx(2),
                     matches=[
                         _payment("multi-1", "full-2"),
                         _payment("multi-2", "full-3"),
                     ],
+                    status=MatchProcessingStatus.NEW,
                 ),
             ],
         ),
@@ -259,8 +297,12 @@ async def test_start_auto_apply_single_matches_builds_decisions_for_single_match
             login="u1",
             payments=[],
             matches=[
-                MatchResult(tx=_tx(3), matches=[]),
-                MatchResult(tx=_tx(4), matches=[_payment("single-4", "full-4")]),
+                MatchResult(tx=_tx(3), matches=[], status=MatchProcessingStatus.NEW),
+                MatchResult(
+                    tx=_tx(4),
+                    matches=[_payment("single-4", "full-4")],
+                    status=MatchProcessingStatus.NEW,
+                ),
             ],
         ),
     )
@@ -295,8 +337,15 @@ async def test_preview_matches_fetches_and_caches_only_requested_page():
     service.fetch_allegro_data = MagicMock(
         return_value=SimpleNamespace(payments=[payment])
     )
-    service.ff_allegro_service.match = AsyncMock(
-        return_value=[MatchResult(tx=_tx(1), matches=[payment])]
+    service.ff_allegro_service.match_with_unmatched = AsyncMock(
+        return_value=(
+            [
+                MatchResult(
+                    tx=_tx(1), matches=[payment], status=MatchProcessingStatus.NEW
+                )
+            ],
+            [],
+        )
     )
 
     await service.preview_matches(user_id=uuid4(), secret_id=secret_id, page=page)
@@ -330,7 +379,9 @@ async def test_start_apply_job_uses_matches_loaded_from_cached_pages(monkeypatch
             page=page_one,
             login="u1",
             payments=[p1],
-            matches=[MatchResult(tx=_tx(1), matches=[p1])],
+            matches=[
+                MatchResult(tx=_tx(1), matches=[p1], status=MatchProcessingStatus.NEW)
+            ],
         ),
     )
     store.put_page_matches(
@@ -339,7 +390,9 @@ async def test_start_apply_job_uses_matches_loaded_from_cached_pages(monkeypatch
             page=page_two,
             login="u1",
             payments=[p2],
-            matches=[MatchResult(tx=_tx(2), matches=[p2])],
+            matches=[
+                MatchResult(tx=_tx(2), matches=[p2], status=MatchProcessingStatus.NEW)
+            ],
         ),
     )
     service = _service(store)

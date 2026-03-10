@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     BLIK_DESCRIPTION_FILTER: str = "BLIK - płatność w internecie"
     TAG_BLIK_DONE: str = "blik_done"
+    MATCH_WITH_UNMATCHED_FUTURE_DAYS: int = 7
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     REFRESH_COOKIE_NAME: str = "refresh_token"
     REFRESH_TOKEN_SECURE: bool = False

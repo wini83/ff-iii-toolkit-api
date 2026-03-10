@@ -3,6 +3,7 @@ from collections.abc import Iterable
 from api.mappers.job_status import map_status
 from api.mappers.tx import map_tx_to_api
 from api.models.allegro import (
+    AllegroMatchResponse,
     AllegroMetricsResultResponse,
     AllegroMetricsStatusResponse,
     AllegroPayment,
@@ -11,13 +12,27 @@ from api.models.allegro import (
     ApplyPayload,
 )
 from api.models.allegro import MatchResult as ApiMatchResult
-from services.domain.allegro import AllegroApplyJob, ApplyOutcome, MatchDecision
+from api.models.tx import MatchProcessingStatus as MatchProcessingStatus
+from services.domain.allegro import (
+    AllegroApplyJob,
+    AllegroMatchPreview,
+    ApplyOutcome,
+    MatchDecision,
+)
 from services.domain.allegro import AllegroOrderPayment as AllegroOrderPaymentDomain
 from services.domain.allegro import AllegroOrderPayments as AllegroOrderPaymentsDomain
+from services.domain.match_result import (
+    MatchProcessingStatus as DomainMatchProcessingStatus,
+)
 from services.domain.match_result import MatchResult as DomainMatchResult
 from services.domain.metrics import AllegroMetrics
 from services.domain.transaction import Transaction
 from services.tx_stats.models import MetricsState
+
+DOMAIN_TO_API_STATUS = {
+    DomainMatchProcessingStatus.NEW: MatchProcessingStatus.NEW,
+    DomainMatchProcessingStatus.ALREADY_PROCESSED: MatchProcessingStatus.ALREADY_PROCESSED,
+}
 
 
 def map_allegro_metrics_state_to_response(
@@ -91,6 +106,7 @@ def map_match_result_to_api(
     return ApiMatchResult(
         tx=simplified_tx,
         matches=matches_api,
+        status=DOMAIN_TO_API_STATUS[result.status],
     )
 
 
@@ -105,6 +121,23 @@ def map_match_results_to_api(
     zero magic
     """
     return [map_match_result_to_api(result) for result in results]
+
+
+def map_match_preview_to_api(preview: AllegroMatchPreview) -> AllegroMatchResponse:
+    return AllegroMatchResponse(
+        login=preview.login,
+        payments_fetched=preview.payments_fetched,
+        transactions_found=preview.transactions_found,
+        transactions_not_matched=preview.transactions_not_matched,
+        transactions_with_one_match=preview.transactions_with_one_match,
+        transactions_with_many_matches=preview.transactions_with_many_matches,
+        fetch_seconds=preview.fetch_seconds,
+        content=map_match_results_to_api(preview.content),
+        unmatched_payments=[
+            map_allegro_payment_to_response(payment)
+            for payment in preview.unmatched_payments
+        ],
+    )
 
 
 def map_job_to_response(job: AllegroApplyJob) -> ApplyJobResponse:

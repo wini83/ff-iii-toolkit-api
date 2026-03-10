@@ -7,7 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from api.models.job_base import JobStatus
-from api.models.tx import SimplifiedTx
+from api.models.tx import MatchProcessingStatus, SimplifiedTx
 
 
 class AllegroMetricsResultResponse(BaseModel):
@@ -43,6 +43,7 @@ class AllegroPayment(BaseModel):
 class MatchResult(BaseModel):
     tx: SimplifiedTx
     matches: list[AllegroPayment]
+    status: MatchProcessingStatus
 
 
 class AllegroMatchResponse(BaseModel):
@@ -54,6 +55,7 @@ class AllegroMatchResponse(BaseModel):
     transactions_with_many_matches: int
     fetch_seconds: float
     content: list[MatchResult]
+    unmatched_payments: list[AllegroPayment]
 
 
 class ApplyDecision(BaseModel):

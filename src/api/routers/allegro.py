@@ -8,6 +8,7 @@ from api.mappers.allegro import (
     map_allegro_metrics_state_to_response,
     map_allegro_payments_to_response,
     map_job_to_response,
+    map_match_preview_to_api,
     map_payload_to_decisions,
 )
 from api.models.allegro import (
@@ -90,7 +91,7 @@ async def preview_matches(
             secret_id=UUID(secret_id),
             page=page,
         )
-        return data
+        return map_match_preview_to_api(data)
     except ValueError as e:
         raise HTTPException(status_code=400, detail="Invalid secret_id") from e
     except InvalidSecretId as e:

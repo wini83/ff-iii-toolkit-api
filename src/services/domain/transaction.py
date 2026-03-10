@@ -48,6 +48,9 @@ class Transaction(BaseMatchItem):
     currency: Currency
     fx: FXContext | None = None
 
+    def has_tag(self, tag: TxTag) -> bool:
+        return tag in self.tags
+
 
 @dataclass
 class TransactionUpdate:

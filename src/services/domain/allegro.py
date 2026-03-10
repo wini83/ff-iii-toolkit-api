@@ -77,6 +77,19 @@ class AllegroPageMatchCacheEntry:
     fetched_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
+@dataclass(slots=True)
+class AllegroMatchPreview:
+    login: str
+    payments_fetched: int
+    transactions_found: int
+    transactions_not_matched: int
+    transactions_with_one_match: int
+    transactions_with_many_matches: int
+    fetch_seconds: float
+    content: list[MatchResult]
+    unmatched_payments: list[AllegroOrderPayment]
+
+
 @dataclass
 class MatchDecision:
     payment_id: str
