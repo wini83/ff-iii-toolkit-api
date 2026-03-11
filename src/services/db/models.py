@@ -42,11 +42,26 @@ class UserORM(Base):
         default=True,
         nullable=False,
     )
+    must_change_password: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+    password_changed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
 
     secrets: Mapped[list["UserSecretORM"]] = relationship(
         "UserSecretORM",
         back_populates="user",
         cascade="all, delete-orphan",
+    )
+    password_set_tokens: Mapped[list["UserPasswordSetTokenORM"]] = relationship(
+        "UserPasswordSetTokenORM",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        foreign_keys="UserPasswordSetTokenORM.user_id",
     )
 
 
@@ -148,4 +163,53 @@ class UserSecretORM(Base):
     user: Mapped["UserORM"] = relationship(
         "UserORM",
         back_populates="secrets",
+    )
+
+
+class UserPasswordSetTokenORM(Base):
+    __tablename__ = "user_password_set_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        GUID(),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    token_hash: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        unique=True,
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+    used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    meta: Mapped[dict | None] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+
+    user: Mapped["UserORM"] = relationship(
+        "UserORM",
+        back_populates="password_set_tokens",
+        foreign_keys=[user_id],
     )

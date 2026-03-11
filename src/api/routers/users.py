@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import String, cast, select
 from sqlalchemy.orm import Session
 
@@ -9,13 +9,25 @@ from api.deps_db import get_db
 from api.models.users import (
     AuditLogItem,
     AuditLogResponse,
+    InviteResponse,
     UserCreateRequest,
+    UserCreateResponse,
     UserResponse,
 )
 from services.db.models import AuditLogORM
-from services.db.passwords import hash_password
-from services.db.repository import AuditLogRepository, UserRepository
+from services.db.repository import (
+    AuditLogRepository,
+    PasswordSetTokenRepository,
+    UserRepository,
+)
 from services.guards import require_superuser
+from services.password_set_tokens import (
+    build_invite_url,
+    generate_password_set_token,
+    generate_placeholder_password_hash,
+    get_password_set_expiry,
+    hash_password_set_token,
+)
 
 router = APIRouter(
     prefix="/api/users", tags=["users"], dependencies=[Depends(require_superuser)]
@@ -33,24 +45,110 @@ def list_users(
 
 @router.post(
     "",
-    response_model=UserResponse,
+    response_model=UserCreateResponse,
     status_code=status.HTTP_201_CREATED,
 )
 def create_user(
     payload: UserCreateRequest,
+    response: Response,
     admin_id: UUID = Depends(require_superuser),
     db: Session = Depends(get_db),
 ):
-    repo = UserRepository(db)
+    user_repo = UserRepository(db)
+    token_repo = PasswordSetTokenRepository(db)
+    audit_repo = AuditLogRepository(db)
 
-    user = repo.create(
+    plain_token = generate_password_set_token()
+    expires_at = get_password_set_expiry()
+
+    user = user_repo.create(
         username=payload.username,
-        password_hash=hash_password(payload.password),
+        password_hash=generate_placeholder_password_hash(),
         is_superuser=payload.is_superuser,
+        must_change_password=True,
+        commit=False,
     )
-    audit = AuditLogRepository(db)
-    audit.log(actor_id=admin_id, action="user.create", target_id=user.id)
-    return user
+    token_repo.create_token(
+        user_id=user.id,
+        token_hash=hash_password_set_token(plain_token),
+        expires_at=expires_at,
+        created_by=admin_id,
+        commit=False,
+    )
+    audit_repo.log(
+        actor_id=admin_id,
+        action="user.create",
+        target_id=user.id,
+        commit=False,
+    )
+    db.commit()
+
+    response.headers["Cache-Control"] = "no-store"
+    return UserCreateResponse(
+        id=user.id,
+        username=user.username,
+        is_superuser=user.is_superuser,
+        is_active=user.is_active,
+        must_change_password=user.must_change_password,
+        invite_url=build_invite_url(plain_token),
+        token=plain_token,
+        expires_at=expires_at,
+    )
+
+
+@router.post(
+    "/{user_id}/invite",
+    response_model=InviteResponse,
+)
+def invite_user(
+    user_id: UUID,
+    response: Response,
+    admin_id: UUID = Depends(require_superuser),
+    db: Session = Depends(get_db),
+):
+    user_repo = UserRepository(db)
+    token_repo = PasswordSetTokenRepository(db)
+    audit_repo = AuditLogRepository(db)
+
+    user = user_repo.get_by_id(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    plain_token = generate_password_set_token()
+    expires_at = get_password_set_expiry()
+    now = datetime.now(UTC)
+
+    user_repo.mark_password_reset_required(
+        user_id=user_id,
+        password_hash=generate_placeholder_password_hash(),
+        commit=False,
+    )
+    token_repo.invalidate_previous(
+        user_id=user_id,
+        invalidated_at=now,
+        commit=False,
+    )
+    token_repo.create_token(
+        user_id=user_id,
+        token_hash=hash_password_set_token(plain_token),
+        expires_at=expires_at,
+        created_by=admin_id,
+        commit=False,
+    )
+    audit_repo.log(
+        actor_id=admin_id,
+        action="user.invite",
+        target_id=user_id,
+        commit=False,
+    )
+    db.commit()
+
+    response.headers["Cache-Control"] = "no-store"
+    return InviteResponse(
+        invite_url=build_invite_url(plain_token),
+        token=plain_token,
+        expires_at=expires_at,
+    )
 
 
 @router.post(

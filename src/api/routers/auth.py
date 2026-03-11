@@ -1,23 +1,31 @@
 # app/api/auth.py
 from datetime import UTC, datetime, timedelta
+from uuid import UUID
 
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from api.deps_db import get_db
-from services.db.passwords import verify_password
-from services.db.repository import UserRepository
+from api.models.auth import SetPasswordRequest, Token
+from services.db.passwords import hash_password, verify_password
+from services.db.repository import (
+    AuditLogRepository,
+    PasswordSetTokenRepository,
+    UserRepository,
+)
+from services.password_set_tokens import hash_password_set_token
 from settings import settings
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+SYSTEM_ACTOR_ID = UUID("00000000-0000-0000-0000-000000000000")
 
 
-class Token(BaseModel):
-    access_token: str
-    token_type: str
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 def create_access_token(subject: str, expires_delta: timedelta | None = None):
@@ -99,3 +107,43 @@ async def refresh_access_token(
 
     access_token = create_access_token(subject=str(subject))
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.post("/set-password", status_code=status.HTTP_204_NO_CONTENT)
+def set_password(
+    payload: SetPasswordRequest,
+    db: Session = Depends(get_db),
+):
+    now = datetime.now(UTC)
+    token_repo = PasswordSetTokenRepository(db)
+    user_repo = UserRepository(db)
+    audit_repo = AuditLogRepository(db)
+
+    token = token_repo.get_by_hash(hash_password_set_token(payload.token))
+    if token is None or token.used_at is not None or _as_utc(token.expires_at) < now:
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+
+    user = user_repo.get_by_id(token.user_id)
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+
+    user_repo.set_password(
+        token.user_id,
+        password_hash=hash_password(payload.new_password),
+        must_change_password=False,
+        password_changed_at=now,
+        commit=False,
+    )
+    token_repo.consume(
+        token_id=token.id,
+        used_at=now,
+        commit=False,
+    )
+    audit_repo.log(
+        actor_id=SYSTEM_ACTOR_ID,
+        action="user.password.set",
+        target_id=token.user_id,
+        metadata={"by_token": True},
+        commit=False,
+    )
+    db.commit()

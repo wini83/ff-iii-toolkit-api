@@ -2,7 +2,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class UserResponse(BaseModel):
@@ -10,12 +10,26 @@ class UserResponse(BaseModel):
     username: str
     is_superuser: bool
     is_active: bool
+    must_change_password: bool
 
 
 class UserCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     username: str
-    password: str
     is_superuser: bool = False
+
+
+class UserCreateResponse(UserResponse):
+    invite_url: str | None
+    token: str
+    expires_at: datetime
+
+
+class InviteResponse(BaseModel):
+    invite_url: str | None
+    token: str
+    expires_at: datetime
 
 
 class MeResponse(BaseModel):
