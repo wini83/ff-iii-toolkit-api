@@ -1,6 +1,7 @@
 import os
 
 os.environ.setdefault("SECRET_KEY", "test-secret")
+os.environ.setdefault("APP_PUBLIC_URL", "https://app.example")
 from pathlib import Path
 
 import pytest
@@ -16,6 +17,7 @@ from api.deps_db import get_db
 from main import create_app  # 👈 TO JEST KLUCZ
 
 os.environ.setdefault("SECRET_KEY", "test-secret")
+os.environ.setdefault("APP_PUBLIC_URL", "https://app.example")
 
 
 def _run_migrations(connection) -> None:

@@ -19,8 +19,11 @@ class Settings(BaseSettings):
     DEMO_MODE: bool = False
 
     SECRET_KEY: str = Field(..., env="SECRET_KEY")
+    PASSWORD_SET_TOKEN_PEPPER: str | None = None
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    PASSWORD_SET_TOKEN_EXPIRE_HOURS: int = 24
+    APP_PUBLIC_URL: str | None = None
     BLIK_DESCRIPTION_FILTER: str = "BLIK - płatność w internecie"
     TAG_BLIK_DONE: str = "blik_done"
     MATCH_WITH_UNMATCHED_FUTURE_DAYS: int = 7

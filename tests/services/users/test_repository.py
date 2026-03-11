@@ -16,6 +16,8 @@ def test_create_and_get_user(db):
     assert fetched.username == "alice"
     assert fetched.is_superuser is True
     assert fetched.is_active is True
+    assert fetched.must_change_password is False
+    assert fetched.password_changed_at is not None
 
 
 def test_disable_user(db):
@@ -77,3 +79,16 @@ def test_delete_user(db):
 
     deleted = repo.get_by_id(user.id)
     assert deleted is None
+
+
+def test_create_user_with_pending_password_change(db):
+    repo = UserRepository(db)
+
+    created = repo.create(
+        username="frank",
+        password_hash="hashed",
+        must_change_password=True,
+    )
+
+    assert created.must_change_password is True
+    assert created.password_changed_at is None

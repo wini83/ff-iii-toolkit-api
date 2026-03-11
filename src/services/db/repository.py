@@ -5,7 +5,14 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from services.db.models import AuditLogORM, SecretType, UserORM, UserSecretORM
+from services.db.models import (
+    AuditLogORM,
+    SecretType,
+    UserORM,
+    UserPasswordSetTokenORM,
+    UserSecretORM,
+)
+from services.domain.password_set_token import PasswordSetToken
 from services.domain.user import User
 
 
@@ -34,17 +41,61 @@ class UserRepository:
         password_hash: str,
         *,
         is_superuser: bool = False,
+        must_change_password: bool = False,
+        password_changed_at: datetime | None = None,
+        commit: bool = True,
     ) -> User:
+        if password_changed_at is None and not must_change_password:
+            password_changed_at = datetime.now(UTC)
         row = UserORM(
             username=username,
             password_hash=password_hash,
             is_superuser=is_superuser,
             is_active=True,
+            must_change_password=must_change_password,
+            password_changed_at=password_changed_at,
         )
         self.db.add(row)
-        self.db.commit()
-        self.db.refresh(row)
+        if commit:
+            self.db.commit()
+            self.db.refresh(row)
+        else:
+            self.db.flush()
         return self._to_domain(row)
+
+    def set_password(
+        self,
+        user_id: UUID,
+        *,
+        password_hash: str,
+        must_change_password: bool,
+        password_changed_at: datetime,
+        commit: bool = True,
+    ) -> None:
+        row = self.db.query(UserORM).filter(UserORM.id == user_id).one()
+        row.password_hash = password_hash
+        row.must_change_password = must_change_password
+        row.password_changed_at = password_changed_at
+        if commit:
+            self.db.commit()
+        else:
+            self.db.flush()
+
+    def mark_password_reset_required(
+        self,
+        user_id: UUID,
+        *,
+        password_hash: str,
+        commit: bool = True,
+    ) -> None:
+        row = self.db.query(UserORM).filter(UserORM.id == user_id).one()
+        row.password_hash = password_hash
+        row.must_change_password = True
+        row.password_changed_at = None
+        if commit:
+            self.db.commit()
+        else:
+            self.db.flush()
 
     def promote_to_superuser(self, user_id: UUID) -> None:
         row = self.db.query(UserORM).filter(UserORM.id == user_id).one()
@@ -91,6 +142,8 @@ class UserRepository:
             password_hash=row.password_hash,
             is_superuser=row.is_superuser,
             is_active=row.is_active,
+            must_change_password=row.must_change_password,
+            password_changed_at=row.password_changed_at,
         )
 
 
@@ -105,15 +158,19 @@ class AuditLogRepository:
         action: str,
         target_id: UUID | None = None,
         metadata: dict | None = None,
+        commit: bool = True,
     ) -> None:
         row = AuditLogORM(
             actor_id=actor_id,
             action=action,
             target_id=target_id,
-            metadata=metadata,
+            meta=metadata,
         )
         self.db.add(row)
-        self.db.commit()
+        if commit:
+            self.db.commit()
+        else:
+            self.db.flush()
 
 
 class UserSecretRepository:
@@ -162,3 +219,91 @@ class UserSecretRepository:
     def delete(self, *, secret: UserSecretORM) -> None:
         self.db.delete(secret)
         self.db.flush()
+
+
+class PasswordSetTokenRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def create_token(
+        self,
+        *,
+        user_id: UUID,
+        token_hash: str,
+        expires_at: datetime,
+        created_by: UUID | None = None,
+        meta: dict | None = None,
+        commit: bool = True,
+    ) -> PasswordSetToken:
+        row = UserPasswordSetTokenORM(
+            user_id=user_id,
+            token_hash=token_hash,
+            expires_at=expires_at,
+            created_by=created_by,
+            meta=meta,
+        )
+        self.db.add(row)
+        if commit:
+            self.db.commit()
+            self.db.refresh(row)
+        else:
+            self.db.flush()
+        return self._to_domain(row)
+
+    def get_by_hash(self, token_hash: str) -> PasswordSetToken | None:
+        row = (
+            self.db.query(UserPasswordSetTokenORM)
+            .filter(UserPasswordSetTokenORM.token_hash == token_hash)
+            .one_or_none()
+        )
+        return self._to_domain(row) if row else None
+
+    def invalidate_previous(
+        self,
+        *,
+        user_id: UUID,
+        invalidated_at: datetime,
+        commit: bool = True,
+    ) -> int:
+        rows = (
+            self.db.query(UserPasswordSetTokenORM)
+            .filter(
+                UserPasswordSetTokenORM.user_id == user_id,
+                UserPasswordSetTokenORM.used_at.is_(None),
+            )
+            .all()
+        )
+        for row in rows:
+            row.used_at = invalidated_at
+        if commit:
+            self.db.commit()
+        else:
+            self.db.flush()
+        return len(rows)
+
+    def consume(
+        self,
+        *,
+        token_id: UUID,
+        used_at: datetime,
+        commit: bool = True,
+    ) -> None:
+        row = self.db.query(UserPasswordSetTokenORM).filter_by(id=token_id).one()
+        row.used_at = used_at
+        if commit:
+            self.db.commit()
+        else:
+            self.db.flush()
+
+    @staticmethod
+    def _to_domain(row: UserPasswordSetTokenORM) -> PasswordSetToken:
+        return PasswordSetToken(
+            id=row.id,
+            user_id=row.user_id,
+            token_hash=row.token_hash,
+            expires_at=row.expires_at,
+            used_at=row.used_at,
+            created_at=row.created_at,
+            created_by=row.created_by,
+            meta=row.meta,
+        )

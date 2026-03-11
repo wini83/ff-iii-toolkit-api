@@ -2,8 +2,10 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from api.routers.auth import create_access_token
-from services.db.models import AuditLogORM
+from services.db.models import AuditLogORM, UserPasswordSetTokenORM
+from services.db.passwords import hash_password, verify_password
 from services.db.repository import UserRepository
+from services.password_set_tokens import hash_password_set_token
 
 
 def _auth_header(user_id: str) -> dict[str, str]:
@@ -67,6 +69,7 @@ def test_list_users_happy_path(client, db):
     assert len(body) == 3
     usernames = {user["username"] for user in body}
     assert {"admin", "user1", "user2"} <= usernames
+    assert all("invite_url" not in user for user in body)
 
 
 def test_list_users_rejects_non_superuser(client, db):
@@ -82,29 +85,43 @@ def test_list_users_rejects_non_superuser(client, db):
     assert response.status_code == 403
 
 
-def test_create_user_happy_path(client, db):
+def test_create_user_returns_invite_url_and_sets_flag(client, db):
     superuser = _create_superuser(db)
 
     response = client.post(
         "/api/users",
         json={
             "username": "new-user",
-            "password": "secret",
             "is_superuser": False,
         },
         headers=_auth_header(str(superuser.id)),
     )
 
     assert response.status_code == 201
+    assert response.headers["Cache-Control"] == "no-store"
     body = response.json()
     assert body["username"] == "new-user"
     assert body["is_superuser"] is False
     assert body["is_active"] is True
+    assert body["must_change_password"] is True
+    assert body["invite_url"].startswith("https://app.example/#/set-password?token=")
+    assert body["token"]
+    assert body["invite_url"].endswith(body["token"])
+    assert body["expires_at"] is not None
 
     repo = UserRepository(db)
     stored = repo.get_by_username("new-user")
     assert stored is not None
-    assert stored.password_hash != "secret"
+    assert stored.must_change_password is True
+    assert stored.password_changed_at is None
+
+    token = (
+        db.query(UserPasswordSetTokenORM)
+        .filter(UserPasswordSetTokenORM.user_id == stored.id)
+        .one_or_none()
+    )
+    assert token is not None
+    assert token.token_hash != body["invite_url"].split("token=", 1)[1]
 
     # 🔍 AUDIT LOG
     log = _find_audit_log(
@@ -114,6 +131,70 @@ def test_create_user_happy_path(client, db):
         target_id=stored.id,
     )
     assert log is not None
+
+
+def test_create_user_rejects_legacy_password_field(client, db):
+    superuser = _create_superuser(db)
+
+    response = client.post(
+        "/api/users",
+        json={
+            "username": "new-user",
+            "password": "legacy-secret",
+            "is_superuser": False,
+        },
+        headers=_auth_header(str(superuser.id)),
+    )
+
+    assert response.status_code == 422
+
+
+def test_admin_invite_creates_new_token_and_invalidates_old(client, db):
+    repo = UserRepository(db)
+    superuser = _create_superuser(db)
+    target = repo.create(
+        username="target",
+        password_hash=hash_password("OldPass123!"),
+        is_superuser=False,
+    )
+    original_password_hash = target.password_hash
+    old_token = UserPasswordSetTokenORM(
+        user_id=target.id,
+        token_hash=hash_password_set_token("old-token"),
+        expires_at=datetime.now(UTC),
+        created_by=superuser.id,
+    )
+    db.add(old_token)
+    db.commit()
+
+    response = client.post(
+        f"/api/users/{target.id}/invite",
+        headers=_auth_header(str(superuser.id)),
+    )
+
+    assert response.status_code == 200
+    assert response.headers["Cache-Control"] == "no-store"
+    body = response.json()
+    assert body["token"]
+    assert body["invite_url"].endswith(body["token"])
+
+    rows = (
+        db.query(UserPasswordSetTokenORM)
+        .filter(UserPasswordSetTokenORM.user_id == target.id)
+        .order_by(UserPasswordSetTokenORM.created_at.asc())
+        .all()
+    )
+    assert len(rows) == 2
+    assert rows[0].used_at is not None
+    assert rows[1].used_at is None
+    assert rows[1].token_hash == hash_password_set_token(body["token"])
+
+    updated = repo.get_by_id(target.id)
+    assert updated is not None
+    assert updated.must_change_password is True
+    assert updated.password_changed_at is None
+    assert updated.password_hash != original_password_hash
+    assert verify_password("OldPass123!", updated.password_hash) is False
 
 
 def test_disable_user_happy_path(client, db):
