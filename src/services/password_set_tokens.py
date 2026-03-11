@@ -1,3 +1,4 @@
+import hmac
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from secrets import token_urlsafe
@@ -11,8 +12,8 @@ def generate_password_set_token() -> str:
 
 
 def hash_password_set_token(token: str) -> str:
-    pepper = settings.PASSWORD_SET_TOKEN_PEPPER or settings.SECRET_KEY
-    return sha256(f"{token}{pepper}".encode()).hexdigest()
+    key = (settings.PASSWORD_SET_TOKEN_PEPPER or settings.SECRET_KEY).encode("utf-8")
+    return hmac.new(key, token.encode("utf-8"), sha256).hexdigest()
 
 
 def get_password_set_expiry() -> datetime:
