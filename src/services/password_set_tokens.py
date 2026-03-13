@@ -23,7 +23,7 @@ def get_password_set_expiry() -> datetime:
 def build_invite_url(token: str) -> str | None:
     if not settings.APP_PUBLIC_URL:
         return None
-    return f"{settings.APP_PUBLIC_URL.rstrip('/')}/#/set-password?token={token}"
+    return f"{settings.APP_PUBLIC_URL.rstrip('/')}/set-password?token={token}"
 
 
 def generate_placeholder_password_hash() -> str:
