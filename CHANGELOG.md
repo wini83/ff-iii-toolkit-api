@@ -1,3 +1,9 @@
+## v2.8.1 (2026-03-13)
+
+### Fix
+
+- **users**: fixed link generation pattern
+
 ## v2.8.0 (2026-03-11)
 
 ## v2.7.0 (2026-03-11)
