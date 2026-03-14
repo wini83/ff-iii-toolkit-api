@@ -104,7 +104,7 @@ def test_create_user_returns_invite_url_and_sets_flag(client, db):
     assert body["is_superuser"] is False
     assert body["is_active"] is True
     assert body["must_change_password"] is True
-    assert body["invite_url"].startswith("https://app.example/#/set-password?token=")
+    assert body["invite_url"].startswith("https://app.example/set-password?token=")
     assert body["token"]
     assert body["invite_url"].endswith(body["token"])
     assert body["expires_at"] is not None
