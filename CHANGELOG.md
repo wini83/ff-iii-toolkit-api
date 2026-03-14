@@ -1,3 +1,9 @@
+## v2.8.2 (2026-03-14)
+
+### Fix
+
+- **users**: align test to changed logic (#35)
+
 ## v2.8.1 (2026-03-13)
 
 ### Fix
