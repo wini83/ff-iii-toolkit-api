@@ -1,3 +1,9 @@
+## v2.9.0 (2026-03-15)
+
+### Feat
+
+- **user-secrets**: add alias to secrets (#36)
+
 ## v2.8.2 (2026-03-14)
 
 ### Fix
