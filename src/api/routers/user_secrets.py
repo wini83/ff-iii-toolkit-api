@@ -3,7 +3,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from api.deps_services import get_user_secrets_service
-from api.models.user_secrets import CreateSecretPayload, UserSecretResponse
+from api.models.user_secrets import (
+    CreateSecretPayload,
+    UpdateSecretAliasPayload,
+    UserSecretResponse,
+)
+from services.exceptions import SecretNotAccessible
 from services.guards import require_active_user
 from services.user_secrets_service import UserSecretsService
 
@@ -24,6 +29,7 @@ def create_secret(
         actor_id=user_id,
         user_id=user_id,
         type=payload.type,
+        alias=payload.alias,
         secret=payload.secret,
     )
     return secret
@@ -35,6 +41,24 @@ def list_secrets(
     service: UserSecretsService = Depends(get_user_secrets_service),
 ):
     return service.list_for_user(user_id=user_id)
+
+
+@router.patch("/{secret_id}", response_model=UserSecretResponse)
+def update_secret_alias(
+    secret_id: UUID,
+    payload: UpdateSecretAliasPayload,
+    user_id: UUID = Depends(require_active_user),
+    service: UserSecretsService = Depends(get_user_secrets_service),
+):
+    try:
+        return service.update_alias(
+            actor_id=user_id,
+            user_id=user_id,
+            secret_id=secret_id,
+            alias=payload.alias,
+        )
+    except SecretNotAccessible as e:
+        raise HTTPException(status_code=404, detail="Secret not found") from e
 
 
 @router.delete("/{secret_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -49,5 +73,5 @@ def delete_secret(
             user_id=user_id,
             secret_id=secret_id,
         )
-    except ValueError as e:
+    except SecretNotAccessible as e:
         raise HTTPException(status_code=404, detail="Secret not found") from e

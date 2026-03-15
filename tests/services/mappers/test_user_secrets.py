@@ -15,6 +15,7 @@ def _secret_obj():
         id=uuid4(),
         user_id=uuid4(),
         type=SecretType.AMAZON,
+        alias="main",
         usage_count=1,
         last_used_at=datetime.now(UTC),
         created_at=datetime.now(UTC),
@@ -27,6 +28,7 @@ def test_map_secret_to_domain_read_model():
     result = map_secret_to_domain_read_model(obj)
     assert result.id == obj.id
     assert result.type == obj.type
+    assert result.alias == obj.alias
     assert result.usage_count == obj.usage_count
     assert result.last_used_at == obj.last_used_at
     assert result.created_at == obj.created_at
@@ -43,10 +45,12 @@ def test_map_secrets_to_domain_read_models():
     assert len(result) == 1
     assert result[0].id == obj.id
     assert result[0].type == obj.type
+    assert result[0].alias == obj.alias
 
 
 def test_map_secret_to_domain_model_includes_secret():
     obj = _secret_obj()
     result = map_secret_to_domain_model(obj)
     assert result.id == obj.id
+    assert result.alias == obj.alias
     assert result.secret == obj.secret
