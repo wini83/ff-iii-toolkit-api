@@ -2,7 +2,14 @@ import hashlib
 from datetime import UTC, datetime
 from uuid import UUID
 
-from api.models.user_secrets import UserSecretResponse
+import pytest
+
+from api.models.user_secrets import (
+    MAX_SECRET_ALIAS_LENGTH,
+    CreateSecretPayload,
+    UpdateSecretAliasPayload,
+    UserSecretResponse,
+)
 from services.domain.user_secrets import SecretType
 
 
@@ -10,6 +17,7 @@ def test_user_secret_response_short_id_is_sha1_prefix():
     secret = UserSecretResponse(
         id=UUID("12345678-1234-5678-1234-567812345678"),
         type=SecretType.ALLEGRO,
+        alias="primary",
         usage_count=0,
         last_used_at=None,
         created_at=datetime(2025, 1, 1, tzinfo=UTC),
@@ -18,3 +26,29 @@ def test_user_secret_response_short_id_is_sha1_prefix():
     expected = hashlib.sha1(str(secret.id).encode()).hexdigest()[:8]
 
     assert secret.short_id == expected
+    assert secret.alias == "primary"
+
+
+def test_create_secret_payload_normalizes_alias():
+    payload = CreateSecretPayload(
+        type=SecretType.ALLEGRO,
+        alias="  main  ",
+        secret="s1",
+    )
+
+    assert payload.alias == "main"
+
+
+def test_update_secret_alias_payload_maps_blank_alias_to_none():
+    payload = UpdateSecretAliasPayload(alias="   ")
+
+    assert payload.alias is None
+
+
+def test_create_secret_payload_rejects_alias_longer_than_limit():
+    with pytest.raises(ValueError):
+        CreateSecretPayload(
+            type=SecretType.ALLEGRO,
+            alias="x" * (MAX_SECRET_ALIAS_LENGTH + 1),
+            secret="s1",
+        )

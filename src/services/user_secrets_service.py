@@ -8,6 +8,7 @@ from services.domain.user_secrets import (
     UserSecretModel,
     UserSecretReadModel,
 )
+from services.exceptions import SecretNotAccessible
 from services.mappers.user_secrets import (
     map_secret_to_domain_model,
     map_secret_to_domain_read_model,
@@ -31,7 +32,7 @@ class UserSecretsService:
 
     def _assert_ownership(self, *, secret: UserSecretORM, user_id: UUID) -> None:
         if secret.user_id != user_id:
-            raise ValueError("Secret not found")
+            raise SecretNotAccessible("Secret not found")
 
     # -------------------------------------------------
     # Commands
@@ -43,11 +44,13 @@ class UserSecretsService:
         actor_id: UUID,
         user_id: UUID,
         type: SecretType,
+        alias: str | None,
         secret: str,
     ) -> UserSecretReadModel:
         obj = self.secret_repo.create(
             user_id=user_id,
             type=type,
+            alias=alias,
             secret=secret,
         )
 
@@ -55,10 +58,33 @@ class UserSecretsService:
             actor_id=actor_id,
             action="user_secret.create",
             target_id=obj.id,
-            metadata={"type": type.value},
+            metadata={"type": type.value, "alias": alias},
         )
 
         return map_secret_to_domain_read_model(obj=obj)
+
+    def update_alias(
+        self,
+        *,
+        actor_id: UUID,
+        user_id: UUID,
+        secret_id: UUID,
+        alias: str | None,
+    ) -> UserSecretReadModel:
+        secret = self.secret_repo.get_by_id(secret_id)
+        if not secret:
+            raise SecretNotAccessible("Secret not found")
+
+        self._assert_ownership(secret=secret, user_id=user_id)
+
+        updated = self.secret_repo.update_alias(secret=secret, alias=alias)
+        self.audit_repo.log(
+            actor_id=actor_id,
+            action="user_secret.update_alias",
+            target_id=secret_id,
+            metadata={"alias": alias},
+        )
+        return map_secret_to_domain_read_model(obj=updated)
 
     def delete(
         self,
@@ -69,7 +95,7 @@ class UserSecretsService:
     ) -> None:
         secret = self.secret_repo.get_by_id(secret_id)
         if not secret:
-            raise ValueError("Secret not found")
+            raise SecretNotAccessible("Secret not found")
 
         self._assert_ownership(secret=secret, user_id=user_id)
 
@@ -111,7 +137,7 @@ class UserSecretsService:
         """
         secret = self.secret_repo.get_by_id(secret_id)
         if not secret:
-            raise ValueError("Secret not found")
+            raise SecretNotAccessible("Secret not found")
 
         self._assert_ownership(secret=secret, user_id=user_id)
 

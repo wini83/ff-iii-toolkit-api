@@ -15,6 +15,7 @@ class SecretType(str, Enum):
 class UserSecretReadModel:
     id: UUID
     type: SecretType
+    alias: str | None
     usage_count: int
     last_used_at: datetime | None
     created_at: datetime

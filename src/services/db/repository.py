@@ -182,11 +182,13 @@ class UserSecretRepository:
         *,
         user_id: UUID,
         type: SecretType,
+        alias: str | None,
         secret: str,
     ) -> UserSecretORM:
         obj = UserSecretORM(
             user_id=user_id,
             type=type.value if hasattr(type, "value") else type,
+            alias=alias,
             secret=secret,
         )
         self.db.add(obj)
@@ -215,6 +217,16 @@ class UserSecretRepository:
         if meta is not None:
             secret.last_used_meta = meta
         self.db.flush()
+
+    def update_alias(
+        self,
+        *,
+        secret: UserSecretORM,
+        alias: str | None,
+    ) -> UserSecretORM:
+        secret.alias = alias
+        self.db.flush()
+        return secret
 
     def delete(self, *, secret: UserSecretORM) -> None:
         self.db.delete(secret)

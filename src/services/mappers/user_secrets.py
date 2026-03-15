@@ -6,6 +6,7 @@ def map_secret_to_domain_read_model(obj: UserSecretORM) -> UserSecretReadModel:
     return UserSecretReadModel(
         id=obj.id,
         type=obj.type,
+        alias=obj.alias,
         usage_count=obj.usage_count,
         last_used_at=obj.last_used_at,
         created_at=obj.created_at,
@@ -19,6 +20,7 @@ def map_secrets_to_domain_read_models(
         UserSecretReadModel(
             id=obj.id,
             type=obj.type,
+            alias=obj.alias,
             usage_count=obj.usage_count,
             last_used_at=obj.last_used_at,
             created_at=obj.created_at,
@@ -31,6 +33,7 @@ def map_secret_to_domain_model(obj: UserSecretORM) -> UserSecretModel:
     return UserSecretModel(
         id=obj.id,
         type=obj.type,
+        alias=obj.alias,
         usage_count=obj.usage_count,
         last_used_at=obj.last_used_at,
         created_at=obj.created_at,

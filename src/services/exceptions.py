@@ -27,6 +27,10 @@ class InvalidSecretId(ApplicationError):
     pass
 
 
+class SecretNotAccessible(ApplicationError):
+    """Secret does not exist or is not available to the current user."""
+
+
 # ---- 5xx ----
 class ExternalServiceFailed(ApplicationError):
     pass

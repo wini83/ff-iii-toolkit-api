@@ -123,6 +123,11 @@ class UserSecretORM(Base):
         index=True,
     )
 
+    alias: Mapped[str | None] = mapped_column(
+        String(16),
+        nullable=True,
+    )
+
     secret: Mapped[str] = mapped_column(
         Text,
         nullable=False,
