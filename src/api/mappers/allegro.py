@@ -1,7 +1,7 @@
 from collections.abc import Iterable
 
 from api.mappers.job_status import map_status
-from api.mappers.tx import map_tx_to_api
+from api.mappers.tx import DOMAIN_TO_API_STATUS, map_tx_to_api
 from api.models.allegro import (
     AllegroMatchResponse,
     AllegroMetricsResultResponse,
@@ -21,18 +21,10 @@ from services.domain.allegro import (
 )
 from services.domain.allegro import AllegroOrderPayment as AllegroOrderPaymentDomain
 from services.domain.allegro import AllegroOrderPayments as AllegroOrderPaymentsDomain
-from services.domain.match_result import (
-    MatchProcessingStatus as DomainMatchProcessingStatus,
-)
 from services.domain.match_result import MatchResult as DomainMatchResult
 from services.domain.metrics import AllegroMetrics
 from services.domain.transaction import Transaction
 from services.tx_stats.models import MetricsState
-
-DOMAIN_TO_API_STATUS = {
-    DomainMatchProcessingStatus.NEW: MatchProcessingStatus.NEW,
-    DomainMatchProcessingStatus.ALREADY_PROCESSED: MatchProcessingStatus.ALREADY_PROCESSED,
-}
 
 
 def map_allegro_metrics_state_to_response(

@@ -3,9 +3,13 @@ import logging
 import os
 import re
 import tempfile
+from asyncio import create_task
+from datetime import UTC, datetime
 from typing import cast
+from uuid import UUID
 
 from api.mappers.blik import (
+    build_blik_match_id,
     map_bank_records_to_simplified,
     map_blik_metrics_to_api,
     map_match_results_to_api,
@@ -18,12 +22,15 @@ from api.models.blik_files import (
     StatisticsResponse,
     UploadResponse,
 )
+from services.blik_state_store import BlikStateStore
 from services.blik_stats.manager import BlikMetricsManager
 from services.csv_reader import BankCSVReader
 from services.domain.bank_record import BankRecord
+from services.domain.blik import ApplyOutcome, BlikApplyJob, MatchDecision
+from services.domain.job_base import JobStatus
 from services.domain.match_result import MatchResult
 from services.domain.metrics import BlikStatisticsMetrics
-from services.domain.transaction import Transaction
+from services.domain.transaction import Transaction, TxTag
 from services.exceptions import (
     ExternalServiceFailed,
     FileNotFound,
@@ -58,11 +65,11 @@ class BlikApplicationService:
         self,
         *,
         blik_service: FireflyBlikService,
+        state_store: BlikStateStore,
     ) -> None:
         self.blik_service = blik_service
+        self.state_store = state_store
         self.blik_metrics_manager = BlikMetricsManager(blik_service=blik_service)
-
-        self._matches_cache: dict[str, list[MatchResult]] = {}
         self._stats_cache: StatisticsResponse | None = None
         self._stats_lock = asyncio.Lock()
 
@@ -115,11 +122,11 @@ class BlikApplicationService:
             matches = await self.blik_service.match(
                 candidates=csv_records,
                 filter_text=settings.BLIK_DESCRIPTION_FILTER,
-                tag_done=settings.TAG_BLIK_DONE,
+                tag_done=TxTag.blik_done,
             )
         except FireflyServiceError as e:
             raise ExternalServiceFailed(str(e)) from e
-        self._matches_cache[encoded_id] = matches
+        self.state_store.put_matches(file_id=encoded_id, matches=matches)
 
         not_matched = len([r for r in matches if not r.matches])
         with_one_match = len([r for r in matches if len(r.matches) == 1])
@@ -148,41 +155,82 @@ class BlikApplicationService:
         encoded_id: str,
         payload: ApplyPayload,
     ) -> FileApplyResponse:
-        if encoded_id not in self._matches_cache:
+        matches = self.state_store.get_matches(file_id=encoded_id)
+        if not matches:
             raise MatchesNotComputed("No match data found")
 
-        matches = self._matches_cache[encoded_id]
-        index = {int(cast(Transaction, m.tx).id): m for m in matches}
+        decisions = self._build_single_match_decisions(
+            matches=matches,
+            tx_ids=payload.tx_indexes,
+        )
 
-        to_update: list[MatchResult] = []
-
-        for tx_id in payload.tx_indexes:
-            match = index.get(tx_id)
-            if not match:
-                raise TransactionNotFound(f"Transaction id {tx_id} not found")
-            if len(match.matches) != 1:
-                raise InvalidMatchSelection(
-                    f"Transaction id {tx_id} does not have exactly one match"
-                )
-            to_update.append(match)
-
-        updated = 0
-        errors: list[str] = []
-
-        for match in to_update:
-            tx = cast(Transaction, match.tx)
-            try:
-                evidence = cast(BankRecord, match.matches[0])
-                await self.blik_service.apply_match(tx=tx, evidence=evidence)
-                updated += 1
-            except FireflyServiceError as e:
-                errors.append(f"Error updating transaction id {tx.id}: {str(e)}")
+        outcomes = await self._apply_decisions(decisions=decisions, matches=matches)
 
         return FileApplyResponse(
             file_id=encoded_id,
-            updated=updated,
-            errors=errors,
+            updated=len(
+                [outcome for outcome in outcomes if outcome.status == "success"]
+            ),
+            errors=[
+                f"Error updating transaction id {outcome.transaction_id}: {outcome.reason}"
+                for outcome in outcomes
+                if outcome.status == "failed" and outcome.reason is not None
+            ],
         )
+
+    async def start_apply_job(
+        self,
+        *,
+        encoded_id: str,
+        decisions: list[MatchDecision],
+    ) -> BlikApplyJob:
+        matches = self.state_store.get_matches(file_id=encoded_id)
+        if not matches:
+            raise MatchesNotComputed("No match data found")
+
+        job = self.state_store.job_manager.create(
+            file_id=encoded_id, total=len(decisions)
+        )
+
+        create_task(
+            self._run_apply_job(
+                job=job,
+                decisions=decisions,
+                matches=matches,
+            )
+        )
+
+        return job
+
+    async def start_auto_apply_single_matches(
+        self,
+        *,
+        encoded_id: str,
+        limit: int | None = None,
+    ) -> BlikApplyJob:
+        matches = self.state_store.get_matches(file_id=encoded_id)
+        if not matches:
+            raise MatchesNotComputed("No match data found")
+
+        single_matches = [match for match in matches if len(match.matches) == 1]
+        if limit is not None:
+            single_matches = single_matches[:limit]
+
+        decisions = [
+            MatchDecision(
+                transaction_id=int(cast(Transaction, match.tx).id),
+                selected_match_id=build_blik_match_id(
+                    transaction_id=int(cast(Transaction, match.tx).id),
+                    record=cast(BankRecord, match.matches[0]),
+                ),
+            )
+            for match in single_matches
+        ]
+
+        return await self.start_apply_job(encoded_id=encoded_id, decisions=decisions)
+
+    def get_apply_job(self, *, job_id: UUID) -> BlikApplyJob | None:
+        return self.state_store.job_manager.get(job_id)
 
     # --------------------------------------------------
     # STATISTICS
@@ -208,9 +256,141 @@ class BlikApplicationService:
     async def refresh_metrics_state(self) -> MetricsState[BlikStatisticsMetrics]:
         return await self.blik_metrics_manager.refresh()
 
+    async def _run_apply_job(
+        self,
+        *,
+        job: BlikApplyJob,
+        decisions: list[MatchDecision],
+        matches: list[MatchResult],
+    ) -> None:
+        job.status = JobStatus.RUNNING
+
+        try:
+            outcomes = await self._apply_decisions(decisions=decisions, matches=matches)
+            for outcome in outcomes:
+                if outcome.status == "success":
+                    job.applied += 1
+                else:
+                    job.failed += 1
+                job.results.append(outcome)
+            job.status = JobStatus.DONE
+        except Exception as e:
+            job.status = JobStatus.FAILED
+            job.results.append(
+                ApplyOutcome(
+                    transaction_id=-1,
+                    selected_match_id=None,
+                    status="failed",
+                    reason=str(e),
+                )
+            )
+        finally:
+            job.finished_at = datetime.now(UTC)
+
     # --------------------------------------------------
     # INTERNAL HELPERS
     # --------------------------------------------------
+
+    def _build_single_match_decisions(
+        self,
+        *,
+        matches: list[MatchResult],
+        tx_ids: list[int],
+    ) -> list[MatchDecision]:
+        index = {int(cast(Transaction, match.tx).id): match for match in matches}
+        decisions: list[MatchDecision] = []
+
+        for tx_id in tx_ids:
+            match = index.get(tx_id)
+            if not match:
+                raise TransactionNotFound(f"Transaction id {tx_id} not found")
+            if len(match.matches) != 1:
+                raise InvalidMatchSelection(
+                    f"Transaction id {tx_id} does not have exactly one match"
+                )
+
+            decisions.append(
+                MatchDecision(
+                    transaction_id=tx_id,
+                    selected_match_id=build_blik_match_id(
+                        transaction_id=tx_id,
+                        record=cast(BankRecord, match.matches[0]),
+                    ),
+                )
+            )
+
+        return decisions
+
+    async def _apply_decisions(
+        self,
+        *,
+        decisions: list[MatchDecision],
+        matches: list[MatchResult],
+    ) -> list[ApplyOutcome]:
+        outcomes: list[ApplyOutcome] = []
+        index = {int(cast(Transaction, match.tx).id): match for match in matches}
+
+        for decision in decisions:
+            tx_id = decision.transaction_id
+            try:
+                match = index.get(tx_id)
+                if not match:
+                    raise TransactionNotFound(f"Transaction id {tx_id} not found")
+
+                evidence = self._find_selected_match(
+                    transaction_id=tx_id,
+                    match=match,
+                    selected_match_id=decision.selected_match_id,
+                )
+                tx = cast(Transaction, match.tx)
+                await self.blik_service.apply_match(tx=tx, evidence=evidence)
+                outcomes.append(
+                    ApplyOutcome(
+                        transaction_id=tx_id,
+                        selected_match_id=decision.selected_match_id,
+                        status="success",
+                    )
+                )
+            except (FireflyServiceError, ExternalServiceFailed) as e:
+                outcomes.append(
+                    ApplyOutcome(
+                        transaction_id=tx_id,
+                        selected_match_id=decision.selected_match_id,
+                        status="failed",
+                        reason=str(e),
+                    )
+                )
+            except Exception as e:
+                outcomes.append(
+                    ApplyOutcome(
+                        transaction_id=tx_id,
+                        selected_match_id=decision.selected_match_id,
+                        status="failed",
+                        reason=str(e),
+                    )
+                )
+
+        return outcomes
+
+    def _find_selected_match(
+        self,
+        *,
+        transaction_id: int,
+        match: MatchResult,
+        selected_match_id: str,
+    ) -> BankRecord:
+        candidates = {
+            build_blik_match_id(
+                transaction_id=transaction_id, record=cast(BankRecord, record)
+            ): cast(BankRecord, record)
+            for record in match.matches
+        }
+        evidence = candidates.get(selected_match_id)
+        if evidence is None:
+            raise InvalidMatchSelection(
+                f"Match id {selected_match_id} not found for transaction id {transaction_id}"
+            )
+        return evidence
 
     @staticmethod
     def _validate_file_id(decoded: str) -> None:
