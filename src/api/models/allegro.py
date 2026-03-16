@@ -43,7 +43,7 @@ class AllegroPayment(BaseModel):
 class MatchResult(BaseModel):
     tx: SimplifiedTx
     matches: list[AllegroPayment]
-    status: MatchProcessingStatus
+    status: MatchProcessingStatus = MatchProcessingStatus.NEW
 
 
 class AllegroMatchResponse(BaseModel):

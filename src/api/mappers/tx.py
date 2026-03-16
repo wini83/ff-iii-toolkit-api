@@ -1,6 +1,9 @@
 from decimal import Decimal
 
-from api.models.tx import SimplifiedCategory, SimplifiedTx
+from api.models.tx import MatchProcessingStatus, SimplifiedCategory, SimplifiedTx
+from services.domain.match_result import (
+    MatchProcessingStatus as DomainMatchProcessingStatus,
+)
 from services.domain.transaction import Category, Transaction
 
 
@@ -45,3 +48,9 @@ def map_tx_to_api(tx: Transaction) -> SimplifiedTx:
 
 def map_category_to_api(cat: Category) -> SimplifiedCategory:
     return SimplifiedCategory(id=cat.id, name=cat.name)
+
+
+DOMAIN_TO_API_STATUS = {
+    DomainMatchProcessingStatus.NEW: MatchProcessingStatus.NEW,
+    DomainMatchProcessingStatus.ALREADY_PROCESSED: MatchProcessingStatus.ALREADY_PROCESSED,
+}

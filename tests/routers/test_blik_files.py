@@ -1,7 +1,10 @@
 from datetime import UTC, date, datetime
+from uuid import uuid4
 
 from api.deps_runtime import get_blik_application_runtime
 from api.models.blik_files import (
+    ApplyDecisionsPayload,
+    ApplyJobResponse,
     ApplyPayload,
     FileApplyResponse,
     FileMatchResponse,
@@ -44,6 +47,7 @@ class FakeBlikApplicationService:
         preview_response: FilePreviewResponse | None = None,
         matches_response: FileMatchResponse | None = None,
         apply_response: FileApplyResponse | None = None,
+        apply_job_response: ApplyJobResponse | None = None,
         preview_error: Exception | None = None,
         matches_error: Exception | None = None,
     ) -> None:
@@ -53,10 +57,14 @@ class FakeBlikApplicationService:
         self.preview_response = preview_response
         self.matches_response = matches_response
         self.apply_response = apply_response
+        self.apply_job_response = apply_job_response
         self.preview_error = preview_error
         self.matches_error = matches_error
         self.uploaded_bytes: bytes | None = None
         self.applied_payload: ApplyPayload | None = None
+        self.applied_decisions_payload: ApplyDecisionsPayload | None = None
+        self.auto_apply_limit: int | None = None
+        self.job_lookup_id = None
 
     async def get_statistics(self, refresh: bool = False):
         return self.statistics_response
@@ -84,6 +92,33 @@ class FakeBlikApplicationService:
     async def apply_matches(self, *, encoded_id: str, payload: ApplyPayload):
         self.applied_payload = payload
         return self.apply_response
+
+    async def start_apply_job(
+        self,
+        *,
+        encoded_id: str,
+        decisions,
+    ):
+        self.applied_decisions_payload = ApplyDecisionsPayload(
+            decisions=[
+                {
+                    "transaction_id": decision.transaction_id,
+                    "selected_match_id": decision.selected_match_id,
+                }
+                for decision in decisions
+            ]
+        )
+        return self.apply_job_response
+
+    async def start_auto_apply_single_matches(
+        self, *, encoded_id: str, limit: int | None = None
+    ):
+        self.auto_apply_limit = limit
+        return self.apply_job_response
+
+    def get_apply_job(self, *, job_id):
+        self.job_lookup_id = job_id
+        return self.apply_job_response
 
 
 def _metrics_state() -> MetricsState[BlikStatisticsMetrics]:
@@ -153,6 +188,7 @@ def _file_match_response() -> FileMatchResponse:
         fx_currency=None,
     )
     record = SimplifiedRecord(
+        match_id="match-1",
         date=date(2024, 1, 2),
         amount=10.0,
         details="Payment",
@@ -168,6 +204,20 @@ def _file_match_response() -> FileMatchResponse:
         transactions_with_one_match=1,
         transactions_with_many_matches=0,
         content=[MatchResult(tx=tx, matches=[record])],
+    )
+
+
+def _apply_job_response() -> ApplyJobResponse:
+    return ApplyJobResponse(
+        id=uuid4(),
+        file_id="file1",
+        status=JobStatus.PENDING,
+        total=2,
+        applied=0,
+        failed=0,
+        started_at=datetime(2024, 1, 1, tzinfo=UTC),
+        finished_at=None,
+        results=[],
     )
 
 
@@ -318,3 +368,75 @@ def test_blik_files_preview_matches_happy_path_returns_200(client, db):
     body = response.json()
     assert body["records_in_file"] == 1
     assert body["content"][0]["tx"]["id"] == 1
+    assert body["content"][0]["matches"][0]["match_id"] == "match-1"
+
+
+def test_blik_files_start_apply_job_happy_path_returns_200(client, db):
+    user = _create_user(db)
+    svc = FakeBlikApplicationService(apply_job_response=_apply_job_response())
+    client.app.dependency_overrides[get_blik_application_runtime] = lambda: svc
+
+    response = client.post(
+        "/api/blik_files/file1/apply",
+        headers=_auth_header(str(user.id)),
+        json={
+            "decisions": [
+                {"transaction_id": 1, "selected_match_id": "match-1"},
+                {"transaction_id": 2, "selected_match_id": "match-2"},
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "pending"
+    assert body["file_id"] == "file1"
+    assert svc.applied_decisions_payload == ApplyDecisionsPayload(
+        decisions=[
+            {"transaction_id": 1, "selected_match_id": "match-1"},
+            {"transaction_id": 2, "selected_match_id": "match-2"},
+        ]
+    )
+
+
+def test_blik_files_auto_apply_happy_path_returns_200(client, db):
+    user = _create_user(db)
+    svc = FakeBlikApplicationService(apply_job_response=_apply_job_response())
+    client.app.dependency_overrides[get_blik_application_runtime] = lambda: svc
+
+    response = client.post(
+        "/api/blik_files/file1/apply/auto?limit=5",
+        headers=_auth_header(str(user.id)),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "pending"
+    assert svc.auto_apply_limit == 5
+
+
+def test_blik_files_get_apply_job_happy_path_returns_200(client, db):
+    user = _create_user(db)
+    job = _apply_job_response()
+    svc = FakeBlikApplicationService(apply_job_response=job)
+    client.app.dependency_overrides[get_blik_application_runtime] = lambda: svc
+
+    response = client.get(
+        f"/api/blik_files/apply-jobs/{job.id}",
+        headers=_auth_header(str(user.id)),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["id"] == str(job.id)
+
+
+def test_blik_files_get_apply_job_returns_404_when_missing(client, db):
+    user = _create_user(db)
+    svc = FakeBlikApplicationService(apply_job_response=None)
+    client.app.dependency_overrides[get_blik_application_runtime] = lambda: svc
+
+    response = client.get(
+        f"/api/blik_files/apply-jobs/{uuid4()}",
+        headers=_auth_header(str(user.id)),
+    )
+
+    assert response.status_code == 404
