@@ -23,7 +23,7 @@ from services.csv_reader import BankCSVReader
 from services.domain.bank_record import BankRecord
 from services.domain.match_result import MatchResult
 from services.domain.metrics import BlikStatisticsMetrics
-from services.domain.transaction import Transaction
+from services.domain.transaction import Transaction, TxTag
 from services.exceptions import (
     ExternalServiceFailed,
     FileNotFound,
@@ -115,7 +115,7 @@ class BlikApplicationService:
             matches = await self.blik_service.match(
                 candidates=csv_records,
                 filter_text=settings.BLIK_DESCRIPTION_FILTER,
-                tag_done=settings.TAG_BLIK_DONE,
+                tag_done=TxTag.blik_done,
             )
         except FireflyServiceError as e:
             raise ExternalServiceFailed(str(e)) from e
