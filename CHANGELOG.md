@@ -1,3 +1,16 @@
+## v2.10.0 (2026-03-16)
+
+### Feat
+
+- **blik**: add async apply jobs and match selection flow
+- **blik**: add async apply jobs and match selection flow
+- **user-secrets**: add alias to secrets
+
+### Fix
+
+- **blik**: align txtag to changed signature
+- **users**: align test to changed logic
+
 ## v2.9.0 (2026-03-15)
 
 ### Feat
