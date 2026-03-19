@@ -8,7 +8,12 @@ import pytest
 from ff_iii_luciferin.api import FireflyAPIError
 
 from services.domain.transaction import Currency, Transaction, TransactionUpdate, TxType
-from services.firefly_base_service import FireflyBaseService, FireflyServiceError
+from services.firefly_base_service import (
+    FireflyBaseService,
+    FireflyServiceError,
+    filter_by_description,
+    filter_out_by_tag,
+)
 
 DEFAULT_CURRENCY = Currency(code="PLN", symbol="zl", decimals=2)
 
@@ -126,3 +131,104 @@ def test_fetch_transactions_with_metrics_maps_stats():
     assert metrics.fetching_duration_ms == 123
     assert metrics.invalid == 1
     assert metrics.multipart == 2
+
+
+def test_filter_by_description_supports_partial_matching_and_exclude():
+    tx1 = Transaction(
+        id=1,
+        date=date(2024, 1, 1),
+        amount=Decimal("10.00"),
+        type=TxType.WITHDRAWAL,
+        description="Allegro order",
+        tags=set(),
+        notes=None,
+        category=None,
+        currency=DEFAULT_CURRENCY,
+    )
+    tx2 = Transaction(
+        id=2,
+        date=date(2024, 1, 2),
+        amount=Decimal("20.00"),
+        type=TxType.WITHDRAWAL,
+        description="Groceries",
+        tags=set(),
+        notes=None,
+        category=None,
+        currency=DEFAULT_CURRENCY,
+    )
+
+    included = filter_by_description([tx1, tx2], "allegro", exact_match=False)
+    excluded = filter_by_description(
+        [tx1, tx2], "allegro", exact_match=False, exclude=True
+    )
+
+    assert included == [tx1]
+    assert excluded == [tx2]
+
+
+def test_filter_out_by_tag_returns_transactions_without_tag():
+    tagged = Transaction(
+        id=1,
+        date=date(2024, 1, 1),
+        amount=Decimal("10.00"),
+        type=TxType.WITHDRAWAL,
+        description="Tagged",
+        tags={"done"},
+        notes=None,
+        category=None,
+        currency=DEFAULT_CURRENCY,
+    )
+    clean = Transaction(
+        id=2,
+        date=date(2024, 1, 2),
+        amount=Decimal("20.00"),
+        type=TxType.WITHDRAWAL,
+        description="Clean",
+        tags=set(),
+        notes=None,
+        category=None,
+        currency=DEFAULT_CURRENCY,
+    )
+
+    result = filter_out_by_tag([tagged, clean], "done")
+
+    assert result == [clean]
+
+
+def test_update_transaction_raises_firefly_service_error():
+    firefly_client = MagicMock()
+    firefly_client.update_transaction = AsyncMock(
+        side_effect=FireflyAPIError("boom", status_code=409)
+    )
+    service = FireflyBaseService(firefly_client)
+    tx = Transaction(
+        id=7,
+        date=date(2024, 1, 1),
+        amount=Decimal("10.00"),
+        type=TxType.WITHDRAWAL,
+        description="Test",
+        tags=set(),
+        notes=None,
+        category=None,
+        currency=DEFAULT_CURRENCY,
+    )
+    payload = TransactionUpdate(description="Updated")
+
+    with pytest.raises(FireflyServiceError, match="Failed to update transaction 7"):
+        asyncio.run(service.update_transaction(tx, payload=payload))
+
+
+def test_fetch_transactions_with_metrics_raises_firefly_service_error():
+    firefly_client = MagicMock()
+    service = FireflyBaseService(firefly_client)
+
+    with (
+        patch(
+            "services.firefly_base_service.fetch_transactions_with_stats",
+            new=AsyncMock(side_effect=FireflyAPIError("boom", status_code=503)),
+        ),
+        pytest.raises(
+            FireflyServiceError, match="Failed to fetch transactions from Firefly iii"
+        ),
+    ):
+        asyncio.run(service.fetch_transactions_with_metrics())

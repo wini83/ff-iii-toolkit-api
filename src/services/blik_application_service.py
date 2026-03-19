@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import os
 import re
@@ -11,15 +10,11 @@ from uuid import UUID
 from api.mappers.blik import (
     build_blik_match_id,
     map_bank_records_to_simplified,
-    map_blik_metrics_to_api,
     map_match_results_to_api,
 )
 from api.models.blik_files import (
-    ApplyPayload,
-    FileApplyResponse,
     FileMatchResponse,
     FilePreviewResponse,
-    StatisticsResponse,
     UploadResponse,
 )
 from services.blik_state_store import BlikStateStore
@@ -40,8 +35,9 @@ from services.exceptions import (
     TransactionNotFound,
 )
 from services.firefly_base_service import FireflyServiceError
-from services.firefly_blik_service import FireflyBlikService
+from services.firefly_enrichment_service import FireflyEnrichmentService
 from services.tx_stats.models import MetricsState
+from services.tx_stats.runner import MetricsProvider
 from settings import settings
 from utils.encoding import decode_base64url, encode_base64url
 
@@ -64,14 +60,14 @@ class BlikApplicationService:
     def __init__(
         self,
         *,
-        blik_service: FireflyBlikService,
+        enrichment_service: FireflyEnrichmentService,
+        metrics_provider: MetricsProvider[BlikStatisticsMetrics],
         state_store: BlikStateStore,
     ) -> None:
-        self.blik_service = blik_service
+        self.enrichment_service = enrichment_service
+        self.metrics_provider = metrics_provider
         self.state_store = state_store
-        self.blik_metrics_manager = BlikMetricsManager(blik_service=blik_service)
-        self._stats_cache: StatisticsResponse | None = None
-        self._stats_lock = asyncio.Lock()
+        self.blik_metrics_manager = BlikMetricsManager(provider=metrics_provider)
 
     # --------------------------------------------------
     # CSV lifecycle
@@ -119,7 +115,7 @@ class BlikApplicationService:
         path = self._resolve_csv_path(decoded)
         csv_records = BankCSVReader(path).parse()
         try:
-            matches = await self.blik_service.match(
+            matches = await self.enrichment_service.match(
                 candidates=csv_records,
                 filter_text=settings.BLIK_DESCRIPTION_FILTER,
                 tag_done=TxTag.blik_done,
@@ -148,35 +144,6 @@ class BlikApplicationService:
     # --------------------------------------------------
     # APPLY
     # --------------------------------------------------
-
-    async def apply_matches(
-        self,
-        *,
-        encoded_id: str,
-        payload: ApplyPayload,
-    ) -> FileApplyResponse:
-        matches = self.state_store.get_matches(file_id=encoded_id)
-        if not matches:
-            raise MatchesNotComputed("No match data found")
-
-        decisions = self._build_single_match_decisions(
-            matches=matches,
-            tx_ids=payload.tx_indexes,
-        )
-
-        outcomes = await self._apply_decisions(decisions=decisions, matches=matches)
-
-        return FileApplyResponse(
-            file_id=encoded_id,
-            updated=len(
-                [outcome for outcome in outcomes if outcome.status == "success"]
-            ),
-            errors=[
-                f"Error updating transaction id {outcome.transaction_id}: {outcome.reason}"
-                for outcome in outcomes
-                if outcome.status == "failed" and outcome.reason is not None
-            ],
-        )
 
     async def start_apply_job(
         self,
@@ -233,25 +200,11 @@ class BlikApplicationService:
         return self.state_store.job_manager.get(job_id)
 
     # --------------------------------------------------
-    # STATISTICS
-    # --------------------------------------------------
-
-    async def get_statistics(self, *, refresh: bool = False) -> StatisticsResponse:
-        async with self._stats_lock:
-            if self._stats_cache is None or refresh:
-                try:
-                    domain_metrics = await self.blik_service.fetch_metrics()
-                except FireflyServiceError as e:
-                    raise ExternalServiceFailed(str(e)) from e
-                self._stats_cache = map_blik_metrics_to_api(domain_metrics)
-        return self._stats_cache
-
-    # --------------------------------------------------
     # METRICS V2
     # --------------------------------------------------
 
-    def get_metrics_state(self) -> MetricsState[BlikStatisticsMetrics]:
-        return self.blik_metrics_manager.get_state()
+    async def get_metrics_state(self) -> MetricsState[BlikStatisticsMetrics]:
+        return await self.blik_metrics_manager.ensure_current()
 
     async def refresh_metrics_state(self) -> MetricsState[BlikStatisticsMetrics]:
         return await self.blik_metrics_manager.refresh()
@@ -343,7 +296,7 @@ class BlikApplicationService:
                     selected_match_id=decision.selected_match_id,
                 )
                 tx = cast(Transaction, match.tx)
-                await self.blik_service.apply_match(tx=tx, evidence=evidence)
+                await self.enrichment_service.apply_match(tx=tx, evidence=evidence)
                 outcomes.append(
                     ApplyOutcome(
                         transaction_id=tx_id,

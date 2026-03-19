@@ -68,7 +68,7 @@ def test_get_user_info_wraps_parse_error(monkeypatch):
 
 def test_api_wrapper_get_and_post_delegate_to_request():
     wrapper = ApiWrapper(session=MagicMock())
-    wrapper.request = MagicMock(return_value={"ok": True})  # type: ignore[method-assign]
+    wrapper.request = MagicMock(return_value={"ok": True})
 
     get_result = wrapper.get("https://example.com", headers={"h": "1"}, auth="a")
     post_result = wrapper.post(

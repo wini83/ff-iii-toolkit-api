@@ -1,17 +1,16 @@
 from datetime import UTC, date, datetime
 from uuid import uuid4
 
+import pytest
+
 from api.deps_runtime import get_blik_application_runtime
 from api.models.blik_files import (
     ApplyDecisionsPayload,
     ApplyJobResponse,
-    ApplyPayload,
-    FileApplyResponse,
     FileMatchResponse,
     FilePreviewResponse,
     MatchResult,
     SimplifiedRecord,
-    StatisticsResponse,
     UploadResponse,
 )
 from api.models.tx import SimplifiedTx
@@ -19,7 +18,14 @@ from api.routers.auth import create_access_token
 from services.db.repository import UserRepository
 from services.domain.job_base import JobStatus
 from services.domain.metrics import BlikStatisticsMetrics
-from services.exceptions import FileNotFound, InvalidFileId
+from services.exceptions import (
+    ExternalServiceFailed,
+    FileNotFound,
+    InvalidFileId,
+    InvalidMatchSelection,
+    MatchesNotComputed,
+    TransactionNotFound,
+)
 from services.tx_stats.models import MetricsState
 
 
@@ -41,35 +47,31 @@ class FakeBlikApplicationService:
     def __init__(
         self,
         *,
-        statistics_response: StatisticsResponse | None = None,
         metrics_state: MetricsState[BlikStatisticsMetrics] | None = None,
         upload_response: UploadResponse | None = None,
         preview_response: FilePreviewResponse | None = None,
         matches_response: FileMatchResponse | None = None,
-        apply_response: FileApplyResponse | None = None,
         apply_job_response: ApplyJobResponse | None = None,
         preview_error: Exception | None = None,
         matches_error: Exception | None = None,
+        apply_job_error: Exception | None = None,
+        auto_apply_error: Exception | None = None,
     ) -> None:
-        self.statistics_response = statistics_response
         self.metrics_state = metrics_state
         self.upload_response = upload_response
         self.preview_response = preview_response
         self.matches_response = matches_response
-        self.apply_response = apply_response
         self.apply_job_response = apply_job_response
         self.preview_error = preview_error
         self.matches_error = matches_error
+        self.apply_job_error = apply_job_error
+        self.auto_apply_error = auto_apply_error
         self.uploaded_bytes: bytes | None = None
-        self.applied_payload: ApplyPayload | None = None
         self.applied_decisions_payload: ApplyDecisionsPayload | None = None
         self.auto_apply_limit: int | None = None
         self.job_lookup_id = None
 
-    async def get_statistics(self, refresh: bool = False):
-        return self.statistics_response
-
-    def get_metrics_state(self):
+    async def get_metrics_state(self):
         return self.metrics_state
 
     async def refresh_metrics_state(self):
@@ -89,16 +91,14 @@ class FakeBlikApplicationService:
             raise self.matches_error
         return self.matches_response
 
-    async def apply_matches(self, *, encoded_id: str, payload: ApplyPayload):
-        self.applied_payload = payload
-        return self.apply_response
-
     async def start_apply_job(
         self,
         *,
         encoded_id: str,
         decisions,
     ):
+        if self.apply_job_error:
+            raise self.apply_job_error
         self.applied_decisions_payload = ApplyDecisionsPayload(
             decisions=[
                 {
@@ -113,6 +113,8 @@ class FakeBlikApplicationService:
     async def start_auto_apply_single_matches(
         self, *, encoded_id: str, limit: int | None = None
     ):
+        if self.auto_apply_error:
+            raise self.auto_apply_error
         self.auto_apply_limit = limit
         return self.apply_job_response
 
@@ -140,19 +142,6 @@ def _metrics_state() -> MetricsState[BlikStatisticsMetrics]:
         error=None,
         progress=None,
         last_updated_at=datetime(2024, 1, 1, tzinfo=UTC),
-    )
-
-
-def _statistics_response() -> StatisticsResponse:
-    return StatisticsResponse(
-        total_transactions=10,
-        single_part_transactions=5,
-        uncategorized_transactions=2,
-        filtered_by_description_exact=1,
-        filtered_by_description_partial=1,
-        not_processed_transactions=2,
-        not_processed_by_month={"2024-01": 1},
-        inclomplete_procesed_by_month={"2024-01": 1},
     )
 
 
@@ -225,22 +214,6 @@ def test_blik_files_requires_auth_returns_401(client):
     response = client.get("/api/blik_files/statistics_v2")
 
     assert response.status_code == 401
-
-
-def test_blik_files_statistics_happy_path_returns_200(client, db):
-    user = _create_user(db)
-    svc = FakeBlikApplicationService(statistics_response=_statistics_response())
-    client.app.dependency_overrides[get_blik_application_runtime] = lambda: svc
-
-    response = client.get(
-        "/api/blik_files/statistics",
-        headers=_auth_header(str(user.id)),
-    )
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["total_transactions"] == 10
-    assert body["not_processed_transactions"] == 2
 
 
 def test_blik_files_statistics_v2_happy_path_returns_200(client, db):
@@ -319,23 +292,32 @@ def test_blik_files_preview_matches_missing_file_returns_404(client, db):
     assert response.status_code == 404
 
 
-def test_blik_files_apply_matches_happy_path_returns_200(client, db):
+def test_blik_files_preview_matches_invalid_id_returns_400(client, db):
     user = _create_user(db)
-    svc = FakeBlikApplicationService(
-        apply_response=FileApplyResponse(file_id="file1", updated=1, errors=[])
-    )
+    svc = FakeBlikApplicationService(matches_error=InvalidFileId("bad-id"))
     client.app.dependency_overrides[get_blik_application_runtime] = lambda: svc
 
-    response = client.post(
-        "/api/blik_files/file1/matches",
+    response = client.get(
+        "/api/blik_files/bad/matches",
         headers=_auth_header(str(user.id)),
-        json={"tx_indexes": [1, 2]},
     )
 
-    assert response.status_code == 200
-    body = response.json()
-    assert body["updated"] == 1
-    assert svc.applied_payload == ApplyPayload(tx_indexes=[1, 2])
+    assert response.status_code == 400
+    assert response.json() == {"detail": "bad-id"}
+
+
+def test_blik_files_preview_matches_external_error_returns_502(client, db):
+    user = _create_user(db)
+    svc = FakeBlikApplicationService(matches_error=ExternalServiceFailed("upstream"))
+    client.app.dependency_overrides[get_blik_application_runtime] = lambda: svc
+
+    response = client.get(
+        "/api/blik_files/file1/matches",
+        headers=_auth_header(str(user.id)),
+    )
+
+    assert response.status_code == 502
+    assert response.json() == {"detail": "upstream"}
 
 
 def test_blik_files_preview_csv_happy_path_returns_200(client, db):
@@ -399,6 +381,34 @@ def test_blik_files_start_apply_job_happy_path_returns_200(client, db):
     )
 
 
+@pytest.mark.parametrize(
+    ("error", "expected_detail"),
+    [
+        (InvalidFileId("bad-id"), "bad-id"),
+        (MatchesNotComputed("missing"), "No match data found"),
+        (TransactionNotFound("tx missing"), "tx missing"),
+        (InvalidMatchSelection("bad selection"), "bad selection"),
+        (ExternalServiceFailed("upstream"), "upstream"),
+    ],
+)
+def test_blik_files_start_apply_job_maps_domain_errors_to_http(
+    client, db, error, expected_detail
+):
+    user = _create_user(db)
+    svc = FakeBlikApplicationService(apply_job_error=error)
+    client.app.dependency_overrides[get_blik_application_runtime] = lambda: svc
+
+    response = client.post(
+        "/api/blik_files/file1/apply",
+        headers=_auth_header(str(user.id)),
+        json={"decisions": [{"transaction_id": 1, "selected_match_id": "match-1"}]},
+    )
+
+    expected_status = 502 if isinstance(error, ExternalServiceFailed) else 400
+    assert response.status_code == expected_status
+    assert response.json() == {"detail": expected_detail}
+
+
 def test_blik_files_auto_apply_happy_path_returns_200(client, db):
     user = _create_user(db)
     svc = FakeBlikApplicationService(apply_job_response=_apply_job_response())
@@ -412,6 +422,47 @@ def test_blik_files_auto_apply_happy_path_returns_200(client, db):
     assert response.status_code == 200
     assert response.json()["status"] == "pending"
     assert svc.auto_apply_limit == 5
+
+
+@pytest.mark.parametrize(
+    ("error", "expected_detail"),
+    [
+        (InvalidFileId("bad-id"), "bad-id"),
+        (MatchesNotComputed("missing"), "No match data found"),
+        (TransactionNotFound("tx missing"), "tx missing"),
+        (InvalidMatchSelection("bad selection"), "bad selection"),
+        (ExternalServiceFailed("upstream"), "upstream"),
+    ],
+)
+def test_blik_files_auto_apply_maps_domain_errors_to_http(
+    client, db, error, expected_detail
+):
+    user = _create_user(db)
+    svc = FakeBlikApplicationService(auto_apply_error=error)
+    client.app.dependency_overrides[get_blik_application_runtime] = lambda: svc
+
+    response = client.post(
+        "/api/blik_files/file1/apply/auto",
+        headers=_auth_header(str(user.id)),
+    )
+
+    expected_status = 502 if isinstance(error, ExternalServiceFailed) else 400
+    assert response.status_code == expected_status
+    assert response.json() == {"detail": expected_detail}
+
+
+def test_blik_files_auto_apply_rejects_limit_above_max(client, db):
+    user = _create_user(db)
+    svc = FakeBlikApplicationService(apply_job_response=_apply_job_response())
+    client.app.dependency_overrides[get_blik_application_runtime] = lambda: svc
+
+    response = client.post(
+        "/api/blik_files/file1/apply/auto?limit=501",
+        headers=_auth_header(str(user.id)),
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["query", "limit"]
 
 
 def test_blik_files_get_apply_job_happy_path_returns_200(client, db):
@@ -440,3 +491,17 @@ def test_blik_files_get_apply_job_returns_404_when_missing(client, db):
     )
 
     assert response.status_code == 404
+
+
+def test_blik_files_get_apply_job_returns_400_for_invalid_uuid(client, db):
+    user = _create_user(db)
+    svc = FakeBlikApplicationService(apply_job_response=None)
+    client.app.dependency_overrides[get_blik_application_runtime] = lambda: svc
+
+    response = client.get(
+        "/api/blik_files/apply-jobs/not-a-uuid",
+        headers=_auth_header(str(user.id)),
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Invalid job_id"}

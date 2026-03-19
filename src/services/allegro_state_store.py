@@ -15,7 +15,7 @@ from services.domain.match_result import MatchResult
 
 
 class AllegroApplyJobManager:
-    def __init__(self):
+    def __init__(self) -> None:
         self._jobs: dict[UUID, AllegroApplyJob] = {}
 
     def create(self, *, secret_id: UUID, total: int) -> AllegroApplyJob:

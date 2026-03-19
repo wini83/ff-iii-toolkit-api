@@ -41,7 +41,7 @@ class BankCSVReader:
     def __init__(self, filename):
         self.filename = filename
 
-    def parse(self):
+    def parse(self) -> list[BankRecord]:
         """Czyta dane z CSV i zwraca listę słowników"""
         records: list[BankRecord] = []
         with open(self.filename, newline="", encoding="utf-8") as csvfile:

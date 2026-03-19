@@ -1,5 +1,5 @@
 import asyncio
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
@@ -8,24 +8,21 @@ import pytest
 
 import services.blik_application_service as app_module
 from api.mappers.blik import build_blik_match_id
-from api.models.blik_files import ApplyPayload
 from services.blik_application_service import BlikApplicationService
 from services.blik_state_store import BlikStateStore
 from services.domain.bank_record import BankRecord
 from services.domain.blik import BlikApplyJob, MatchDecision
 from services.domain.job_base import JobStatus
 from services.domain.match_result import MatchResult
-from services.domain.metrics import BlikStatisticsMetrics
 from services.domain.transaction import Currency, Transaction, TxType
 from services.exceptions import (
     ExternalServiceFailed,
     FileNotFound,
     InvalidFileId,
-    InvalidMatchSelection,
     MatchesNotComputed,
 )
 from services.firefly_base_service import FireflyServiceError
-from services.firefly_blik_service import FireflyBlikService
+from services.tx_stats.models import MetricsState
 from settings import settings
 from utils.encoding import encode_base64url
 
@@ -39,7 +36,8 @@ def anyio_backend():
 
 def _service(state_store: BlikStateStore | None = None) -> BlikApplicationService:
     return BlikApplicationService(
-        blik_service=MagicMock(spec=FireflyBlikService),
+        enrichment_service=MagicMock(),
+        metrics_provider=MagicMock(),
         state_store=state_store or BlikStateStore(),
     )
 
@@ -162,10 +160,12 @@ def test_preview_matches_calls_service_and_returns_counts():
         MatchResult(tx=tx3, matches=[csv_records[0], record_extra]),
     ]
 
-    blik_service = MagicMock(spec=FireflyBlikService)
+    blik_service = MagicMock()
     blik_service.match = AsyncMock(return_value=matches)
     service = BlikApplicationService(
-        blik_service=blik_service, state_store=BlikStateStore()
+        enrichment_service=blik_service,
+        metrics_provider=MagicMock(),
+        state_store=BlikStateStore(),
     )
 
     with (
@@ -206,10 +206,12 @@ def test_preview_matches_propagates_firefly_error():
         )
     ]
 
-    blik_service = MagicMock(spec=FireflyBlikService)
+    blik_service = MagicMock()
     blik_service.match = AsyncMock(side_effect=FireflyServiceError("boom"))
     service = BlikApplicationService(
-        blik_service=blik_service, state_store=BlikStateStore()
+        enrichment_service=blik_service,
+        metrics_provider=MagicMock(),
+        state_store=BlikStateStore(),
     )
 
     with (
@@ -222,9 +224,11 @@ def test_preview_matches_propagates_firefly_error():
 
 
 def test_preview_csv_rejects_invalid_file_id():
-    blik_service = MagicMock(spec=FireflyBlikService)
+    blik_service = MagicMock()
     service = BlikApplicationService(
-        blik_service=blik_service, state_store=BlikStateStore()
+        enrichment_service=blik_service,
+        metrics_provider=MagicMock(),
+        state_store=BlikStateStore(),
     )
     bad_id = encode_base64url("../bad")
 
@@ -233,9 +237,11 @@ def test_preview_csv_rejects_invalid_file_id():
 
 
 def test_preview_csv_raises_when_file_missing():
-    blik_service = MagicMock(spec=FireflyBlikService)
+    blik_service = MagicMock()
     service = BlikApplicationService(
-        blik_service=blik_service, state_store=BlikStateStore()
+        enrichment_service=blik_service,
+        metrics_provider=MagicMock(),
+        state_store=BlikStateStore(),
     )
     encoded_id = encode_base64url("missing")
 
@@ -246,115 +252,32 @@ def test_preview_csv_raises_when_file_missing():
         asyncio.run(service.preview_csv(encoded_id=encoded_id))
 
 
-def test_apply_matches_updates_transactions():
-    encoded_id = encode_base64url("file123")
-    tx = Transaction(
-        id=1,
-        date=date(2024, 1, 5),
-        amount=Decimal("10.00"),
-        type=TxType.WITHDRAWAL,
-        description="blik",
-        tags=set(),
-        notes=None,
-        category=None,
-        currency=DEFAULT_CURRENCY,
+@pytest.mark.anyio
+async def test_get_metrics_state_triggers_refresh_when_pending():
+    expected_state = MetricsState(
+        status=JobStatus.RUNNING,
+        result=None,
+        error=None,
+        progress="queued",
+        last_updated_at=None,
     )
-    evidence = BankRecord(
-        date=date(2024, 1, 5),
-        amount=Decimal("10.00"),
-        details="BLIK payment",
-        recipient="ACME",
-        operation_amount=Decimal("10.00"),
+    manager = MagicMock()
+    manager.get_state.return_value = MetricsState(
+        status=JobStatus.PENDING,
+        result=None,
+        error=None,
+        progress=None,
+        last_updated_at=None,
     )
-    match = MatchResult(tx=tx, matches=[evidence])
+    manager.ensure_current = AsyncMock(return_value=expected_state)
 
-    blik_service = MagicMock(spec=FireflyBlikService)
-    blik_service.apply_match = AsyncMock()
-    service = BlikApplicationService(
-        blik_service=blik_service, state_store=BlikStateStore()
-    )
-    service.state_store.put_matches(file_id=encoded_id, matches=[match])
+    service = _service()
+    service.blik_metrics_manager = manager
 
-    payload = ApplyPayload(tx_indexes=[1])
-    response = asyncio.run(
-        service.apply_matches(encoded_id=encoded_id, payload=payload)
-    )
+    state = await service.get_metrics_state()
 
-    blik_service.apply_match.assert_awaited_once_with(tx=tx, evidence=evidence)
-    assert response.file_id == encoded_id
-    assert response.updated == 1
-    assert response.errors == []
-
-
-def test_apply_matches_rejects_non_single_match():
-    encoded_id = encode_base64url("file123")
-    tx = Transaction(
-        id=1,
-        date=date(2024, 1, 5),
-        amount=Decimal("10.00"),
-        type=TxType.WITHDRAWAL,
-        description="blik",
-        tags=set(),
-        notes=None,
-        category=None,
-        currency=DEFAULT_CURRENCY,
-    )
-    evidence_a = BankRecord(
-        date=date(2024, 1, 5),
-        amount=Decimal("10.00"),
-        details="BLIK payment",
-        recipient="ACME",
-        operation_amount=Decimal("10.00"),
-    )
-    evidence_b = BankRecord(
-        date=date(2024, 1, 5),
-        amount=Decimal("10.00"),
-        details="BLIK payment",
-        recipient="Shop",
-        operation_amount=Decimal("10.00"),
-    )
-    match = MatchResult(tx=tx, matches=[evidence_a, evidence_b])
-
-    blik_service = MagicMock(spec=FireflyBlikService)
-    service = BlikApplicationService(
-        blik_service=blik_service, state_store=BlikStateStore()
-    )
-    service.state_store.put_matches(file_id=encoded_id, matches=[match])
-
-    payload = ApplyPayload(tx_indexes=[1])
-    with pytest.raises(InvalidMatchSelection):
-        asyncio.run(service.apply_matches(encoded_id=encoded_id, payload=payload))
-
-
-def test_get_statistics_fetches_once_and_caches():
-    metrics = BlikStatisticsMetrics(
-        total_transactions=10,
-        fetching_duration_ms=5,
-        single_part_transactions=7,
-        uncategorized_transactions=2,
-        filtered_by_description_exact=3,
-        filtered_by_description_partial=1,
-        not_processed_transactions=4,
-        not_processed_by_month={"2024-01": 2},
-        inclomplete_procesed_by_month={"2024-01": 1},
-        time_stamp=datetime(2024, 1, 1),
-    )
-    blik_service = MagicMock(spec=FireflyBlikService)
-    blik_service.fetch_metrics = AsyncMock(return_value=metrics)
-    service = BlikApplicationService(
-        blik_service=blik_service, state_store=BlikStateStore()
-    )
-
-    async def run():
-        first = await service.get_statistics()
-        second = await service.get_statistics()
-        return first, second
-
-    stats_first, stats_second = asyncio.run(run())
-
-    assert blik_service.fetch_metrics.await_count == 1
-    assert stats_first.total_transactions == 10
-    assert stats_second.filtered_by_description_exact == 3
+    manager.ensure_current.assert_awaited_once()
+    assert state is expected_state
 
 
 @pytest.mark.anyio
@@ -387,7 +310,8 @@ async def test_start_apply_job_creates_job_and_schedules_task(monkeypatch):
     store = BlikStateStore()
     store.put_matches(file_id=encoded_id, matches=[match])
     service = BlikApplicationService(
-        blik_service=MagicMock(spec=FireflyBlikService),
+        enrichment_service=MagicMock(),
+        metrics_provider=MagicMock(),
         state_store=store,
     )
 
@@ -450,7 +374,7 @@ async def test_run_apply_job_counts_success_and_failures():
         operation_amount=Decimal("12.00"),
     )
 
-    blik_service = MagicMock(spec=FireflyBlikService)
+    blik_service = MagicMock()
 
     async def _apply_match(*, tx, evidence):
         if int(tx.id) == 2:
@@ -458,7 +382,9 @@ async def test_run_apply_job_counts_success_and_failures():
 
     blik_service.apply_match = AsyncMock(side_effect=_apply_match)
     service = BlikApplicationService(
-        blik_service=blik_service, state_store=BlikStateStore()
+        enrichment_service=blik_service,
+        metrics_provider=MagicMock(),
+        state_store=BlikStateStore(),
     )
 
     matches = [
@@ -570,7 +496,8 @@ async def test_start_auto_apply_single_matches_builds_decisions_for_single_match
         ],
     )
     service = BlikApplicationService(
-        blik_service=MagicMock(spec=FireflyBlikService),
+        enrichment_service=MagicMock(),
+        metrics_provider=MagicMock(),
         state_store=store,
     )
     job = BlikApplyJob(

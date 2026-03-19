@@ -1,5 +1,6 @@
 from datetime import date
 from decimal import Decimal
+from typing import cast
 
 import pytest
 
@@ -167,7 +168,7 @@ def test_build_tx_update_raises_type_error_when_details_contain_none():
     payment = OrderPayment(
         date=date(2025, 1, 10),
         amount=Decimal("10.00"),
-        details=[None],  # type: ignore[list-item]
+        details=cast(list[str], [None]),
         tag_done=TxTag.allegro_done,
     )
     tx = make_tx(amount=Decimal("10.00"), tx_date=date(2025, 1, 10), notes=None)

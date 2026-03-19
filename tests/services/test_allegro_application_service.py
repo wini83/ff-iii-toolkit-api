@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -61,11 +61,19 @@ def _payment(external_short_id: str, external_id: str) -> AllegroOrderPayment:
 
 
 def _service(state_store: AllegroStateStore | None = None) -> AllegroApplicationService:
+    metrics_provider = MagicMock()
+    metrics_provider.get_cached_snapshot_timestamp = AsyncMock(
+        return_value=datetime.now(app_module.UTC)
+    )
+    metrics_provider.fetch_metrics = AsyncMock()
+    metrics_provider.refresh_metrics = AsyncMock()
     return AllegroApplicationService(
         secrets_service=MagicMock(),
-        ff_allegro_service=MagicMock(),
+        enrichment_service=MagicMock(),
+        metrics_provider=metrics_provider,
         allegro_service=MagicMock(),
         state_store=state_store or AllegroStateStore(),
+        filter_desc_allegro="allegro",
     )
 
 
@@ -112,7 +120,7 @@ async def test_preview_matches_uses_unknown_login_for_empty_payments():
     secret_id = uuid4()
     page = AllegroPageRequest(limit=10, offset=20)
     service.fetch_allegro_data = MagicMock(return_value=SimpleNamespace(payments=[]))
-    service.ff_allegro_service.match_with_unmatched = AsyncMock(return_value=([], []))
+    service.enrichment_service.match_with_unmatched = AsyncMock(return_value=([], []))
 
     result = await service.preview_matches(
         user_id=uuid4(), secret_id=secret_id, page=page
@@ -133,7 +141,7 @@ async def test_preview_matches_returns_unmatched_payments():
     service.fetch_allegro_data = MagicMock(
         return_value=SimpleNamespace(payments=[matched_payment, unmatched_payment])
     )
-    service.ff_allegro_service.match_with_unmatched = AsyncMock(
+    service.enrichment_service.match_with_unmatched = AsyncMock(
         return_value=(
             [
                 MatchResult(
@@ -209,9 +217,11 @@ async def test_run_apply_job_counts_success_and_failures():
 
     service = AllegroApplicationService(
         secrets_service=MagicMock(),
-        ff_allegro_service=ff,
+        enrichment_service=ff,
+        metrics_provider=MagicMock(),
         allegro_service=MagicMock(),
         state_store=AllegroStateStore(),
+        filter_desc_allegro="allegro",
     )
 
     tx1 = _tx(1)
@@ -337,7 +347,7 @@ async def test_preview_matches_fetches_and_caches_only_requested_page():
     service.fetch_allegro_data = MagicMock(
         return_value=SimpleNamespace(payments=[payment])
     )
-    service.ff_allegro_service.match_with_unmatched = AsyncMock(
+    service.enrichment_service.match_with_unmatched = AsyncMock(
         return_value=(
             [
                 MatchResult(
@@ -454,14 +464,43 @@ def test_clear_cached_secret_delegates_to_state_store():
     assert store.get_all_matches(secret_id=secret_id) == []
 
 
-def test_get_metrics_state_recreates_manager_if_missing():
+@pytest.mark.anyio
+async def test_get_metrics_state_recreates_manager_if_missing():
     service = _service()
     service.state_store.metrics_manager = None
 
-    state = service.get_metrics_state()
+    state = await service.get_metrics_state()
 
-    assert state.status == JobStatus.PENDING
+    assert state.status == JobStatus.RUNNING
     assert service.state_store.metrics_manager is not None
+
+
+@pytest.mark.anyio
+async def test_get_metrics_state_triggers_refresh_when_pending():
+    expected_state = MetricsState(
+        status=JobStatus.RUNNING,
+        result=None,
+        error=None,
+        progress="queued",
+        last_updated_at=None,
+    )
+    manager = MagicMock()
+    manager.get_state.return_value = MetricsState(
+        status=JobStatus.PENDING,
+        result=None,
+        error=None,
+        progress=None,
+        last_updated_at=None,
+    )
+    manager.ensure_current = AsyncMock(return_value=expected_state)
+
+    store = AllegroStateStore(metrics_manager=manager)
+    service = _service(store)
+
+    state = await service.get_metrics_state()
+
+    manager.ensure_current.assert_awaited_once()
+    assert state is expected_state
 
 
 @pytest.mark.anyio

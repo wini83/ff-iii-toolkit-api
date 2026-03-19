@@ -37,7 +37,6 @@ class UserSecretResponse(BaseModel):
     created_at: datetime
 
     @computed_field
-    @property
     def short_id(self) -> str:
         return hashlib.sha1(str(self.id).encode()).hexdigest()[:8]
 
