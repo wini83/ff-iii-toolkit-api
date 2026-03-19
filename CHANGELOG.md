@@ -1,3 +1,9 @@
+## v2.10.1 (2026-03-19)
+
+### Refactor
+
+- unify Firefly metrics around shared transaction snapshots
+
 ## v2.10.0 (2026-03-16)
 
 ### Feat
