@@ -11,9 +11,17 @@ from services.db.repository import (
     UserRepository,
     UserSecretRepository,
 )
-from services.firefly_allegro_service import FireflyAllegroService
-from services.firefly_blik_service import FireflyBlikService
+from services.firefly_base_service import FireflyBaseService
+from services.firefly_enrichment_service import FireflyEnrichmentService
 from services.firefly_tx_service import FireflyTxService
+from services.snapshot import (
+    InMemorySnapshotStore,
+    SnapshotAllegroMetricsService,
+    SnapshotBlikMetricsService,
+    SnapshotStore,
+    SnapshotTxMetricsService,
+    TransactionSnapshotService,
+)
 from services.system.bootstrap import BootstrapService
 from services.user_secrets_service import UserSecretsService
 from settings import settings
@@ -31,12 +39,15 @@ def get_firefly_client() -> FireflyClient:
 
 
 @lru_cache(maxsize=1)
-def get_firefly_blik_service() -> FireflyBlikService:
+def get_firefly_base_service() -> FireflyBaseService:
     client = get_firefly_client()
-    return FireflyBlikService(
-        client,
-        settings.BLIK_DESCRIPTION_FILTER,
-    )
+    return FireflyBaseService(client)
+
+
+@lru_cache(maxsize=1)
+def get_firefly_enrichment_service() -> FireflyEnrichmentService:
+    client = get_firefly_client()
+    return FireflyEnrichmentService(client)
 
 
 @lru_cache(maxsize=1)
@@ -46,6 +57,44 @@ def get_firefly_tx_service() -> FireflyTxService:
         client,
         settings.BLIK_DESCRIPTION_FILTER,
         getattr(settings, "ALLEGRO_DESCRIPTION_FILTER", "allegro"),
+    )
+
+
+@lru_cache(maxsize=1)
+def get_snapshot_store() -> SnapshotStore:
+    return InMemorySnapshotStore()
+
+
+@lru_cache(maxsize=1)
+def get_transaction_snapshot_service() -> TransactionSnapshotService:
+    return TransactionSnapshotService(
+        store=get_snapshot_store(),
+        firefly_service=get_firefly_base_service(),
+    )
+
+
+@lru_cache(maxsize=1)
+def get_snapshot_blik_metrics_service() -> SnapshotBlikMetricsService:
+    return SnapshotBlikMetricsService(
+        snapshot_service=get_transaction_snapshot_service(),
+        filter_desc_blik=settings.BLIK_DESCRIPTION_FILTER,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_snapshot_allegro_metrics_service() -> SnapshotAllegroMetricsService:
+    return SnapshotAllegroMetricsService(
+        snapshot_service=get_transaction_snapshot_service(),
+        filter_desc_allegro=getattr(settings, "ALLEGRO_DESCRIPTION_FILTER", "allegro"),
+    )
+
+
+@lru_cache(maxsize=1)
+def get_snapshot_tx_metrics_service() -> SnapshotTxMetricsService:
+    return SnapshotTxMetricsService(
+        snapshot_service=get_transaction_snapshot_service(),
+        filter_desc_blik=settings.BLIK_DESCRIPTION_FILTER,
+        filter_desc_allegro=getattr(settings, "ALLEGRO_DESCRIPTION_FILTER", "allegro"),
     )
 
 
@@ -63,14 +112,6 @@ def get_bootstrap_service(
 ) -> BootstrapService:
     return BootstrapService(
         user_repo=UserRepository(db),
-    )
-
-
-def get_firefly_allegro_service() -> FireflyAllegroService:
-    client = get_firefly_client()
-    return FireflyAllegroService(
-        client,
-        getattr(settings, "ALLEGRO_DESCRIPTION_FILTER", "allegro"),
     )
 
 

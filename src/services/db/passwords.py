@@ -1,11 +1,10 @@
-from passlib.context import CryptContext
+from argon2 import PasswordHasher
+from argon2.exceptions import InvalidHashError, VerifyMismatchError
 
-_pwd = CryptContext(
-    schemes=["argon2", "bcrypt"],
-    deprecated="auto",
-    argon2__time_cost=3,  # CPU work factor
-    argon2__memory_cost=64 * 1024,  # 64 MB RAM
-    argon2__parallelism=2,
+_pwd = PasswordHasher(
+    time_cost=3,
+    memory_cost=64 * 1024,  # 64 MB
+    parallelism=2,
 )
 
 
@@ -14,4 +13,7 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(password: str, password_hash: str) -> bool:
-    return _pwd.verify(password, password_hash)
+    try:
+        return _pwd.verify(password_hash, password)
+    except (VerifyMismatchError, InvalidHashError):
+        return False

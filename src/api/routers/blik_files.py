@@ -9,11 +9,8 @@ from api.mappers.blik_stats import map_blik_metrics_state_to_response
 from api.models.blik_files import (
     ApplyDecisionsPayload,
     ApplyJobResponse,
-    ApplyPayload,
-    FileApplyResponse,
     FileMatchResponse,
     FilePreviewResponse,
-    StatisticsResponse,
     UploadResponse,
 )
 from api.models.blik_stats import BlikMetricsStatusResponse
@@ -42,41 +39,13 @@ logger = logging.getLogger(__name__)
 
 
 @router.get(
-    "/statistics",
-    response_model=StatisticsResponse,
-    deprecated=True,
-)
-async def get_statistics(
-    svc: BlikApplicationService = Depends(get_blik_application_runtime),
-):
-    try:
-        return await svc.get_statistics()
-    except ExternalServiceFailed as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
-
-
-@router.post(
-    "/statistics/refresh",
-    response_model=StatisticsResponse,
-    deprecated=True,
-)
-async def refresh_statistics(
-    svc: BlikApplicationService = Depends(get_blik_application_runtime),
-):
-    try:
-        return await svc.get_statistics(refresh=True)
-    except ExternalServiceFailed as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
-
-
-@router.get(
     "/statistics_v2",
     response_model=BlikMetricsStatusResponse,
 )
 async def get_statistics_current(
     svc: BlikApplicationService = Depends(get_blik_application_runtime),
 ):
-    state = svc.get_metrics_state()
+    state = await svc.get_metrics_state()
     return map_blik_metrics_state_to_response(state)
 
 
@@ -133,30 +102,6 @@ async def preview_matches(
         raise HTTPException(status_code=400, detail=str(e)) from e
     except FileNotFound as e:
         raise HTTPException(status_code=404, detail="File not found") from e
-    except ExternalServiceFailed as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
-
-
-@router.post(
-    "/{encoded_id}/matches",
-    response_model=FileApplyResponse,
-    deprecated=True,
-)
-async def apply_matches(
-    encoded_id: str,
-    payload: ApplyPayload,
-    svc: BlikApplicationService = Depends(get_blik_application_runtime),
-):
-    try:
-        return await svc.apply_matches(encoded_id=encoded_id, payload=payload)
-    except InvalidFileId as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except MatchesNotComputed as e:
-        raise HTTPException(status_code=400, detail="No match data found") from e
-    except TransactionNotFound as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except InvalidMatchSelection as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
     except ExternalServiceFailed as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
 
