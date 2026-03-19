@@ -95,7 +95,7 @@ class FakeAllegroSvc:
             raise self._auto_error
         return self._auto_job
 
-    def get_metrics_state(self):
+    async def get_metrics_state(self):
         return self._metrics_state
 
     async def refresh_metrics_state(self):

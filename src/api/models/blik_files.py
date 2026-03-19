@@ -28,25 +28,10 @@ class MatchResult(BaseModel):
     status: MatchProcessingStatus = MatchProcessingStatus.NEW
 
 
-class StatisticsResponse(BaseModel):
-    total_transactions: int
-    single_part_transactions: int
-    uncategorized_transactions: int
-    filtered_by_description_exact: int
-    filtered_by_description_partial: int
-    not_processed_transactions: int
-    not_processed_by_month: dict[str, int]
-    inclomplete_procesed_by_month: dict[str, int]
-
-
 class UploadResponse(BaseModel):
     message: str
     count: int
     id: str
-
-
-class ApplyPayload(BaseModel):
-    tx_indexes: list[int]
 
 
 class ApplyDecision(BaseModel):
@@ -74,12 +59,6 @@ class FileMatchResponse(BaseModel):
     transactions_with_one_match: int
     transactions_with_many_matches: int
     content: list[MatchResult]
-
-
-class FileApplyResponse(BaseModel):
-    file_id: str
-    updated: int
-    errors: list[str]
 
 
 class ApplyOutcomeResponse(BaseModel):

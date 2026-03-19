@@ -8,7 +8,6 @@ from api.models.blik_files import (
     ApplyJobResponse,
     ApplyOutcomeResponse,
     SimplifiedRecord,
-    StatisticsResponse,
 )
 from api.models.blik_files import (
     MatchResult as ApiMatchResult,
@@ -16,7 +15,6 @@ from api.models.blik_files import (
 from services.domain.bank_record import BankRecord
 from services.domain.blik import ApplyOutcome, BlikApplyJob, MatchDecision
 from services.domain.match_result import MatchResult as DomainMatchResult
-from services.domain.metrics import BlikStatisticsMetrics
 from services.domain.transaction import Transaction
 
 
@@ -148,19 +146,6 @@ def map_match_results_to_api(
     zero magic
     """
     return [map_match_result_to_api(result) for result in results]
-
-
-def map_blik_metrics_to_api(metrics: BlikStatisticsMetrics) -> StatisticsResponse:
-    return StatisticsResponse(
-        total_transactions=metrics.total_transactions,
-        single_part_transactions=metrics.single_part_transactions,
-        uncategorized_transactions=metrics.uncategorized_transactions,
-        filtered_by_description_exact=metrics.filtered_by_description_exact,
-        filtered_by_description_partial=metrics.filtered_by_description_partial,
-        not_processed_transactions=metrics.not_processed_transactions,
-        not_processed_by_month=metrics.not_processed_by_month,
-        inclomplete_procesed_by_month=metrics.inclomplete_procesed_by_month,
-    )
 
 
 def map_apply_outcome_to_response(outcome: ApplyOutcome) -> ApplyOutcomeResponse:

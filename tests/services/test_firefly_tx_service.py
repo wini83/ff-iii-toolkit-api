@@ -131,6 +131,96 @@ def test_get_categories_raises_firefly_service_error():
         asyncio.run(service.get_categories())
 
 
+def test_get_transaction_maps_result():
+    firefly_client = MagicMock()
+    firefly_client.get_transaction = AsyncMock(
+        return_value=SimpleNamespace(
+            id=7,
+            date=date(2024, 1, 10),
+            amount=Decimal("15.00"),
+            type=SimpleNamespace(value="withdrawal"),
+            description="Lunch",
+            tags=["blik_done"],
+            notes="note",
+            category=SimpleNamespace(id=3, name="Food"),
+            currency=SimpleNamespace(code="PLN", symbol="zl", decimals=2),
+            fx=None,
+        )
+    )
+    service = FireflyTxService(
+        firefly_client, filter_desc_blik="blik", filter_desc_allegro="allegro"
+    )
+
+    result = asyncio.run(service.get_transaction(7))
+
+    firefly_client.get_transaction.assert_awaited_once_with(7)
+    assert result.id == 7
+    assert result.description == "Lunch"
+    assert result.category is not None
+    assert result.category.id == 3
+
+
+def test_get_transaction_raises_firefly_service_error():
+    firefly_client = MagicMock()
+    firefly_client.get_transaction = AsyncMock(
+        side_effect=FireflyAPIError("boom", status_code=404)
+    )
+    service = FireflyTxService(
+        firefly_client, filter_desc_blik="blik", filter_desc_allegro="allegro"
+    )
+
+    with pytest.raises(FireflyServiceError, match="Failed to fetch transaction 7"):
+        asyncio.run(service.get_transaction(7))
+
+
+def test_apply_category_updates_transaction_with_category_payload():
+    service = FireflyTxService(
+        MagicMock(), filter_desc_blik="blik", filter_desc_allegro="allegro"
+    )
+    tx = Transaction(
+        id=9,
+        date=date(2024, 1, 5),
+        amount=Decimal("10.00"),
+        type=TxType.WITHDRAWAL,
+        description="test",
+        tags=set(),
+        notes=None,
+        category=None,
+        currency=DEFAULT_CURRENCY,
+    )
+    service.update_transaction = AsyncMock()
+
+    asyncio.run(service.apply_category(tx, category_id=33))
+
+    payload = service.update_transaction.await_args.kwargs["payload"]
+    assert payload.category_id == 33
+    service.update_transaction.assert_awaited_once_with(tx, payload=payload)
+
+
+def test_add_tag_mutates_transaction_and_updates_tags():
+    service = FireflyTxService(
+        MagicMock(), filter_desc_blik="blik", filter_desc_allegro="allegro"
+    )
+    tx = Transaction(
+        id=9,
+        date=date(2024, 1, 5),
+        amount=Decimal("10.00"),
+        type=TxType.WITHDRAWAL,
+        description="test",
+        tags={"existing"},
+        notes=None,
+        category=None,
+        currency=DEFAULT_CURRENCY,
+    )
+    service.update_transaction = AsyncMock()
+
+    asyncio.run(service.add_tag(tx, tag="new-tag"))
+
+    payload = service.update_transaction.await_args.args[1]
+    assert tx.tags == {"existing", "new-tag"}
+    assert set(payload.tags or []) == {"existing", "new-tag"}
+
+
 def test_apply_category_by_id_delegates_to_helpers():
     service = FireflyTxService(
         MagicMock(), filter_desc_blik="blik", filter_desc_allegro="allegro"
@@ -153,3 +243,27 @@ def test_apply_category_by_id_delegates_to_helpers():
 
     service.get_transaction.assert_awaited_once_with(9)
     service.apply_category.assert_awaited_once_with(tx=tx, category_id=33)
+
+
+def test_add_tag_by_id_delegates_to_helpers():
+    service = FireflyTxService(
+        MagicMock(), filter_desc_blik="blik", filter_desc_allegro="allegro"
+    )
+    tx = Transaction(
+        id=9,
+        date=date(2024, 1, 5),
+        amount=Decimal("10.00"),
+        type=TxType.WITHDRAWAL,
+        description="test",
+        tags=set(),
+        notes=None,
+        category=None,
+        currency=DEFAULT_CURRENCY,
+    )
+    service.get_transaction = AsyncMock(return_value=tx)
+    service.add_tag = AsyncMock()
+
+    asyncio.run(service.add_tag_by_id(tx_id=9, tag="blik_done"))
+
+    service.get_transaction.assert_awaited_once_with(9)
+    service.add_tag.assert_awaited_once_with(tx=tx, tag="blik_done")

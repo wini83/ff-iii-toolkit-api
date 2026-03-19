@@ -222,7 +222,7 @@ def get_apply_job(
 async def get_statistics_current(
     svc: AllegroApplicationService = Depends(get_allegro_application_runtime),
 ):
-    state = svc.get_metrics_state()
+    state = await svc.get_metrics_state()
     return map_allegro_metrics_state_to_response(state)
 
 

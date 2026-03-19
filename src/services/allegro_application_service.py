@@ -29,9 +29,10 @@ from services.exceptions import (
     MatchesNotComputed,
     TransactionNotFound,
 )
-from services.firefly_allegro_service import FireflyAllegroService
 from services.firefly_base_service import FireflyServiceError
+from services.firefly_enrichment_service import FireflyEnrichmentService
 from services.tx_stats.models import MetricsState
+from services.tx_stats.runner import MetricsProvider
 from services.user_secrets_service import UserSecretsService
 
 
@@ -39,17 +40,21 @@ class AllegroApplicationService:
     def __init__(
         self,
         secrets_service: UserSecretsService,
-        ff_allegro_service: FireflyAllegroService,
+        enrichment_service: FireflyEnrichmentService,
+        metrics_provider: MetricsProvider[AllegroMetrics],
         allegro_service: AllegroService,
         state_store: AllegroStateStore,
+        filter_desc_allegro: str,
     ) -> None:
         self.secrets_service = secrets_service
-        self.ff_allegro_service = ff_allegro_service
+        self.enrichment_service = enrichment_service
+        self.metrics_provider = metrics_provider
         self.allegro_service = allegro_service
         self.state_store = state_store
+        self.filter_desc_allegro = filter_desc_allegro
         if self.state_store.metrics_manager is None:
             self.state_store.metrics_manager = AllegroMetricsManager(
-                ff_allegro_service=self.ff_allegro_service
+                provider=self.metrics_provider
             )
 
     def get_allegro_secrets(self, user_id: UUID) -> list[UserSecretReadModel]:
@@ -91,8 +96,8 @@ class AllegroApplicationService:
         self, *, payments: list[AllegroOrderPayment]
     ) -> tuple[list[MatchResult], list[AllegroOrderPayment]]:
         try:
-            matches, unmatched = await self.ff_allegro_service.match_with_unmatched(
-                filter_text=self.ff_allegro_service.filter_desc_allegro,
+            matches, unmatched = await self.enrichment_service.match_with_unmatched(
+                filter_text=self.filter_desc_allegro,
                 tag_done=TxTag.allegro_done,
                 candidates=payments,
             )
@@ -215,7 +220,7 @@ class AllegroApplicationService:
                         f"Payment id {decision.payment_id} not found for transaction id {tx_id}"  # shortID
                     )
                 tx = cast(Transaction, match_result.tx)
-                await self.ff_allegro_service.apply_match(tx=tx, evidence=payment)
+                await self.enrichment_service.apply_match(tx=tx, evidence=payment)
                 job.applied += 1
                 job.results.append(ApplyOutcome(transaction_id=tx_id, status="success"))
 
@@ -268,13 +273,13 @@ class AllegroApplicationService:
     def _ensure_metrics_manager(self) -> AllegroMetricsManager:
         if self.state_store.metrics_manager is None:
             self.state_store.metrics_manager = AllegroMetricsManager(
-                ff_allegro_service=self.ff_allegro_service
+                provider=self.metrics_provider
             )
         return self.state_store.metrics_manager
 
-    def get_metrics_state(self) -> MetricsState[AllegroMetrics]:
+    async def get_metrics_state(self) -> MetricsState[AllegroMetrics]:
         manager = self._ensure_metrics_manager()
-        return manager.get_state()
+        return await manager.ensure_current()
 
     async def refresh_metrics_state(self) -> MetricsState[AllegroMetrics]:
         manager = self._ensure_metrics_manager()

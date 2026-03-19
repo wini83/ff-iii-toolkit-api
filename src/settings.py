@@ -3,7 +3,7 @@ import os
 from typing import Any
 
 from dotenv import load_dotenv
-from pydantic import Field, field_validator
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Load .env immediately
@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     allowed_origins: Any = ["*"]
     DEMO_MODE: bool = False
 
-    SECRET_KEY: str = Field(..., env="SECRET_KEY")
+    SECRET_KEY: str  # = Field(..., env="SECRET_KEY")
     PASSWORD_SET_TOKEN_PEPPER: str | None = None
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
@@ -70,4 +70,4 @@ class Settings(BaseSettings):
 
 
 # pyright: reportCallIssue=false
-settings = Settings()
+settings = Settings()  # type: ignore[call-arg]
