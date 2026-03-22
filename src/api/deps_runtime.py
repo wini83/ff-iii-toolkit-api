@@ -18,6 +18,11 @@ from services.allegro_service import AllegroService
 from services.allegro_state_store import AllegroStateStore, get_allegro_state_store
 from services.blik_application_service import BlikApplicationService
 from services.blik_state_store import get_blik_state_store
+from services.citi_import.cache import get_citi_import_store
+from services.citi_import.exporter import CitiCsvZipExporter
+from services.citi_import.mapper import CitiBankRecordMapper
+from services.citi_import.parser import CitiTextParser
+from services.citi_import.service import CitiImportService
 from services.firefly_enrichment_service import FireflyEnrichmentService
 from services.tx_application_service import TxApplicationService
 from services.user_secrets_service import UserSecretsService
@@ -38,6 +43,16 @@ def get_tx_application_runtime() -> TxApplicationService:
     return TxApplicationService(
         tx_service=get_firefly_tx_service(),
         metrics_provider=get_snapshot_tx_metrics_service(),
+    )
+
+
+@lru_cache(maxsize=1)
+def get_citi_import_runtime() -> CitiImportService:
+    return CitiImportService(
+        parser=CitiTextParser(),
+        mapper=CitiBankRecordMapper(),
+        store=get_citi_import_store(),
+        exporter=CitiCsvZipExporter(),
     )
 
 

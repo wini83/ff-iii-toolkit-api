@@ -141,3 +141,5 @@ htmlcov/
 data/app.db
 
 *.patch
+
+sandbox/*
