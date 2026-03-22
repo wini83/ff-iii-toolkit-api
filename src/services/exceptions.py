@@ -7,6 +7,10 @@ class InvalidFileId(ApplicationError):
     pass
 
 
+class InvalidFileFormat(ApplicationError):
+    pass
+
+
 class FileNotFound(ApplicationError):
     pass
 
