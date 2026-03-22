@@ -1,3 +1,9 @@
+## v2.11.0 (2026-03-22)
+
+### Feat
+
+- **citi**: add cached import preview and csv export endpoints (#44) (#45)
+
 ## v2.10.1 (2026-03-19)
 
 ### Refactor
