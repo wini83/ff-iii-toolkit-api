@@ -17,6 +17,17 @@ class VersionResponse(BaseModel):
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class TransactionSnapshotStatusResponse(BaseModel):
+    ttl_seconds: int
+    has_snapshot: bool
+    snapshot_fetched_at: datetime | None
+    expires_at: datetime | None
+    is_stale: bool
+    transaction_count: int | None = None
+    schema_version: int | None = None
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
 class BootstrapResponse(BaseModel):
     bootstrapped: bool
 

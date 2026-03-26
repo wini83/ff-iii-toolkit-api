@@ -1,16 +1,23 @@
+from datetime import timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from api.deps_db import get_db
-from api.deps_services import get_bootstrap_service
+from api.deps_services import (
+    get_bootstrap_service,
+    get_transaction_snapshot_service,
+)
 from api.models.system import (
     BootstrapPayload,
     BootstrapResponse,
     HealthResponse,
+    TransactionSnapshotStatusResponse,
     VersionResponse,
 )
 from services.db.passwords import hash_password
+from services.snapshot import TransactionSnapshotService
 from services.system.bootstrap import BootstrapAlreadyDone, BootstrapService
 
 router = APIRouter(prefix="/api/system", tags=["system"])
@@ -45,6 +52,39 @@ async def health_check(
 async def version_check(request: Request):
     version = getattr(request.app.state, "version", "unknown")
     return VersionResponse(version=version)
+
+
+@router.get(
+    "/transaction-snapshot",
+    response_model=TransactionSnapshotStatusResponse,
+)
+async def transaction_snapshot_status(
+    snapshot_service: TransactionSnapshotService = Depends(
+        get_transaction_snapshot_service
+    ),
+):
+    snapshot = await snapshot_service.get_cached_snapshot()
+    if snapshot is None:
+        return TransactionSnapshotStatusResponse(
+            ttl_seconds=snapshot_service.max_age_seconds,
+            has_snapshot=False,
+            snapshot_fetched_at=None,
+            expires_at=None,
+            is_stale=True,
+        )
+
+    is_stale = await snapshot_service.store.is_stale(snapshot_service.max_age_seconds)
+
+    return TransactionSnapshotStatusResponse(
+        ttl_seconds=snapshot_service.max_age_seconds,
+        has_snapshot=True,
+        snapshot_fetched_at=snapshot.fetched_at,
+        expires_at=snapshot.fetched_at
+        + timedelta(seconds=snapshot_service.max_age_seconds),
+        is_stale=is_stale,
+        transaction_count=snapshot.transaction_count,
+        schema_version=snapshot.schema_version,
+    )
 
 
 @router.get("/bootstrap/status", response_model=BootstrapResponse)

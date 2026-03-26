@@ -26,3 +26,8 @@ def test_allowed_origins_json_list_parses_list():
 def test_allowed_origins_invalid_json_raises():
     with pytest.raises(ValueError):
         Settings(allowed_origins='["https://a.com"')
+
+
+def test_transaction_snapshot_ttl_seconds_has_default():
+    settings = Settings(TRANSACTION_SNAPSHOT_TTL_SECONDS=86400)
+    assert settings.TRANSACTION_SNAPSHOT_TTL_SECONDS == 86400
