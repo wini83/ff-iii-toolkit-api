@@ -135,12 +135,18 @@ def test_get_transaction_snapshot_service_uses_store_and_firefly_service(monkeyp
     monkeypatch.setattr(
         deps_services, "get_firefly_base_service", lambda: firefly_service
     )
+    monkeypatch.setattr(
+        deps_services,
+        "settings",
+        SimpleNamespace(TRANSACTION_SNAPSHOT_TTL_SECONDS=86400),
+    )
 
     service = deps_services.get_transaction_snapshot_service()
 
     assert isinstance(service, TransactionSnapshotService)
     assert service.store is store
     assert service.firefly_service is firefly_service
+    assert service.max_age_seconds == 86400
 
 
 def test_get_snapshot_blik_metrics_service_uses_snapshot_service(monkeypatch):

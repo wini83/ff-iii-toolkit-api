@@ -70,6 +70,7 @@ def get_transaction_snapshot_service() -> TransactionSnapshotService:
     return TransactionSnapshotService(
         store=get_snapshot_store(),
         firefly_service=get_firefly_base_service(),
+        max_age_seconds=settings.TRANSACTION_SNAPSHOT_TTL_SECONDS,
     )
 
 

@@ -107,6 +107,7 @@ Documented keys that currently exist in `.env.example` and/or code:
 | `SECRET_KEY` | `.env.example`, `src/settings.py` | JWT signing key (required). |
 | `ALGORITHM` | `.env.example`, `src/settings.py` | JWT algorithm (default `HS256`). |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `.env.example`, `src/settings.py` | Access-token TTL in minutes. |
+| `TRANSACTION_SNAPSHOT_TTL_SECONDS` | `.env.example`, `src/settings.py` | Shared in-memory TTL for transaction snapshots used by statistics endpoints. |
 | `DEMO_MODE` | `.env.example`, `src/settings.py` | Feature flag (currently not used by routers/services). |
 | `LOG_LEVEL` | `.env.example`, `src/settings.py` | Root logging level. |
 | `ALLOWED_ORIGINS` | `.env.example`, `src/settings.py` | CORS origins (`*`, CSV list, or JSON list). |

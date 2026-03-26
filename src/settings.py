@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     BLIK_DESCRIPTION_FILTER: str = "BLIK - płatność w internecie"
     TAG_BLIK_DONE: str = "blik_done"
     MATCH_WITH_UNMATCHED_FUTURE_DAYS: int = 7
+    TRANSACTION_SNAPSHOT_TTL_SECONDS: int = 300
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     REFRESH_COOKIE_NAME: str = "refresh_token"
     REFRESH_TOKEN_SECURE: bool = False
