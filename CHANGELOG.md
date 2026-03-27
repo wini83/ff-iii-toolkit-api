@@ -1,3 +1,9 @@
+## v2.11.1 (2026-03-26)
+
+### Refactor
+
+- **system**: make transaction snapshot TTL configurable and expose /api/system/transaction-snapshot
+
 ## v2.11.0 (2026-03-22)
 
 ### Feat
