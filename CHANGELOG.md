@@ -1,3 +1,9 @@
+## v2.11.2 (2026-03-29)
+
+### Refactor
+
+- **citi-import**: shorten export filenames and include transaction date range (#50)
+
 ## v2.11.1 (2026-03-26)
 
 ### Refactor
