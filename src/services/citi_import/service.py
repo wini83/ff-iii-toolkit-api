@@ -95,13 +95,17 @@ class CitiImportService:
 
     async def export_csv_zip(self, *, file_id: str) -> CitiExportPayload:
         entry = self.store.get(file_id=file_id)
+        export_name = self.exporter.build_export_name(
+            file_id=file_id,
+            records=entry.records,
+        )
         content = self.exporter.export_zip(
             file_id=file_id,
             records=entry.records,
             chunk_size=entry.chunk_size,
         )
         return CitiExportPayload(
-            filename=f"citi_import_{file_id}.zip",
+            filename=f"{export_name}.zip",
             media_type="application/zip",
             content=BytesIO(content),
         )

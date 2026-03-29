@@ -130,10 +130,14 @@ def test_citi_export_csv_returns_zip(client, db):
 
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/zip"
+    assert (
+        response.headers["content-disposition"]
+        == f'attachment; filename="citi_{file_id[:6]}_20250116_20250117.zip"'
+    )
     with ZipFile(BytesIO(response.content)) as archive:
         assert archive.namelist() == [
-            f"citi_import_{file_id}_1.csv",
-            f"citi_import_{file_id}_2.csv",
+            f"citi_{file_id[:6]}_20250116_20250117_1.csv",
+            f"citi_{file_id[:6]}_20250116_20250117_2.csv",
         ]
 
 

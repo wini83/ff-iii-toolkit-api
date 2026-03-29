@@ -27,8 +27,8 @@ def test_exporter_returns_single_csv_zip_when_records_fit_chunk():
     )
 
     with ZipFile(BytesIO(payload)) as archive:
-        assert archive.namelist() == ["citi_import_file-1.csv"]
-        content = archive.read("citi_import_file-1.csv").decode()
+        assert archive.namelist() == ["citi_file-1_20250101_20250101.csv"]
+        content = archive.read("citi_file-1_20250101_20250101.csv").decode()
 
     assert "Date;Amount;Payee;Description" in content
     assert "2025-01-01;-1.00;Shop 1;Shop 1" in content
@@ -45,6 +45,6 @@ def test_exporter_splits_csv_into_multiple_files_when_chunk_size_is_exceeded():
 
     with ZipFile(BytesIO(payload)) as archive:
         assert archive.namelist() == [
-            "citi_import_file-1_1.csv",
-            "citi_import_file-1_2.csv",
+            "citi_file-1_20250101_20250103_1.csv",
+            "citi_file-1_20250101_20250103_2.csv",
         ]
