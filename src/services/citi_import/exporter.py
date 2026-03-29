@@ -27,6 +27,7 @@ class CitiCsvZipExporter:
         records: list[BankRecord],
         chunk_size: int,
     ) -> bytes:
+        export_name = self.build_export_name(file_id=file_id, records=records)
         effective_chunk_size = max(1, chunk_size)
         chunks = [
             records[index : index + effective_chunk_size]
@@ -38,11 +39,20 @@ class CitiCsvZipExporter:
             for index, chunk in enumerate(chunks, start=1):
                 suffix = f"_{index}" if len(chunks) > 1 else ""
                 archive.writestr(
-                    f"citi_import_{file_id}{suffix}.csv",
+                    f"{export_name}{suffix}.csv",
                     self._render_csv(chunk),
                 )
 
         return buffer.getvalue()
+
+    def build_export_name(self, *, file_id: str, records: list[BankRecord]) -> str:
+        short_file_id = file_id[:6]
+        if not records:
+            return f"citi_{short_file_id}"
+
+        first_date = records[0].date.strftime("%Y%m%d")
+        last_date = records[-1].date.strftime("%Y%m%d")
+        return f"citi_{short_file_id}_{first_date}_{last_date}"
 
     def _render_csv(self, records: list[BankRecord]) -> str:
         output = StringIO()
