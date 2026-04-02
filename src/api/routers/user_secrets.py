@@ -80,15 +80,7 @@ def setup_vault(
 ):
     try:
         service.setup_vault(user_id, payload.passphrase)
-    except (
-        VaultAlreadyConfigured,
-        VaultNotConfigured,
-        InvalidVaultPassphrase,
-        VaultLocked,
-        VaultSessionExpired,
-        SecretDecryptionFailed,
-        SecretNotAccessible,
-    ) as exc:
+    except VaultAlreadyConfigured as exc:
         _raise_user_secret_http_error(exc)
     return VaultStatusResponse(configured=True, unlocked=False)
 
@@ -102,15 +94,7 @@ def unlock_vault(
 ):
     try:
         vault_session_id = service.unlock_vault(user_id, payload.passphrase)
-    except (
-        VaultAlreadyConfigured,
-        VaultNotConfigured,
-        InvalidVaultPassphrase,
-        VaultLocked,
-        VaultSessionExpired,
-        SecretDecryptionFailed,
-        SecretNotAccessible,
-    ) as exc:
+    except (VaultNotConfigured, InvalidVaultPassphrase) as exc:
         _raise_user_secret_http_error(exc)
 
     _set_vault_session_cookie(response, vault_session_id)
@@ -164,13 +148,9 @@ def create_secret(
         )
         return secret
     except (
-        VaultAlreadyConfigured,
         VaultNotConfigured,
-        InvalidVaultPassphrase,
         VaultLocked,
         VaultSessionExpired,
-        SecretDecryptionFailed,
-        SecretNotAccessible,
     ) as exc:
         _raise_user_secret_http_error(exc)
 
@@ -181,7 +161,7 @@ def list_secrets(
     service: UserSecretsService = Depends(get_user_secrets_service),
 ):
     """Return secret metadata only; no plaintext reveal endpoint is exposed."""
-    return service.list_for_user(user_id=user_id)
+    return service.list_secrets(user_id=user_id)
 
 
 @router.patch("/{secret_id}", response_model=UserSecretResponse)
@@ -207,9 +187,7 @@ def update_secret(
             secret=payload.secret if "secret" in payload.model_fields_set else ...,
         )
     except (
-        VaultAlreadyConfigured,
         VaultNotConfigured,
-        InvalidVaultPassphrase,
         VaultLocked,
         VaultSessionExpired,
         SecretDecryptionFailed,
@@ -225,18 +203,10 @@ def delete_secret(
     service: UserSecretsService = Depends(get_user_secrets_service),
 ):
     try:
-        service.delete(
+        service.delete_secret(
             actor_id=user_id,
             user_id=user_id,
             secret_id=secret_id,
         )
-    except (
-        VaultAlreadyConfigured,
-        VaultNotConfigured,
-        InvalidVaultPassphrase,
-        VaultLocked,
-        VaultSessionExpired,
-        SecretDecryptionFailed,
-        SecretNotAccessible,
-    ) as exc:
+    except SecretNotAccessible as exc:
         _raise_user_secret_http_error(exc)

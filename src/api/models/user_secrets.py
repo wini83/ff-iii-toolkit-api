@@ -64,10 +64,6 @@ class UpdateSecretPayload(BaseModel):
         return _normalize_alias(value)
 
 
-class UpdateSecretAliasPayload(UpdateSecretPayload):
-    pass
-
-
 class VaultPassphrasePayload(BaseModel):
     passphrase: str = Field(min_length=1)
 

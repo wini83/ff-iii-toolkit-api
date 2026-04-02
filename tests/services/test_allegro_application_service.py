@@ -82,7 +82,7 @@ def test_get_allegro_secrets_filters_only_allegro():
     service = _service()
     allegro_secret = SimpleNamespace(type=SecretType.ALLEGRO)
     blik_secret = SimpleNamespace(type=SecretType.AMAZON)
-    service.secrets_service.list_for_user.return_value = [allegro_secret, blik_secret]
+    service.secrets_service.list_secrets.return_value = [allegro_secret, blik_secret]
 
     secrets = service.get_allegro_secrets(user_id=uuid4())
 
@@ -91,8 +91,8 @@ def test_get_allegro_secrets_filters_only_allegro():
 
 def test_fetch_allegro_data_wraps_missing_secret():
     service = _service()
-    service.secrets_service.get_decrypted_secret.side_effect = SecretNotAccessible(
-        "missing"
+    service.secrets_service.get_secret_for_internal_use.side_effect = (
+        SecretNotAccessible("missing")
     )
 
     with pytest.raises(InvalidSecretId, match="Secret with id"):
@@ -107,7 +107,7 @@ def test_fetch_allegro_data_wraps_missing_secret():
 def test_fetch_allegro_data_wraps_external_error():
     service = _service()
     secret = SimpleNamespace(secret="cookie", id=uuid4())
-    service.secrets_service.get_decrypted_secret.return_value = secret
+    service.secrets_service.get_secret_for_internal_use.return_value = secret
     service.allegro_service.fetch.side_effect = RuntimeError("upstream")
 
     with pytest.raises(ExternalServiceFailed, match="Failed to fetch allegro data"):

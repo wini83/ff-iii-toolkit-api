@@ -44,6 +44,28 @@ router = APIRouter(
 logger = logging.getLogger(__name__)
 
 
+def _raise_allegro_http_error(exc: Exception) -> None:
+    if isinstance(exc, VaultLocked):
+        raise HTTPException(status_code=423, detail="Vault is locked") from exc
+    if isinstance(exc, VaultSessionExpired):
+        raise HTTPException(status_code=401, detail="Vault session expired") from exc
+    if isinstance(exc, VaultNotConfigured):
+        raise HTTPException(status_code=409, detail="Vault not configured") from exc
+    if isinstance(exc, SecretDecryptionFailed):
+        raise HTTPException(status_code=422, detail="Secret decryption failed") from exc
+    if isinstance(exc, InvalidSecretId):
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if isinstance(exc, MatchesNotComputed):
+        raise HTTPException(status_code=400, detail="No match data found") from exc
+    if isinstance(exc, TransactionNotFound):
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if isinstance(exc, InvalidMatchSelection):
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if isinstance(exc, ExternalServiceFailed):
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    raise exc
+
+
 # --------------------------------------------------
 # Endpoints
 # --------------------------------------------------
@@ -77,18 +99,15 @@ def fetch_for_id(
         return map_allegro_payments_to_response(payments)
     except ValueError as e:
         raise HTTPException(status_code=400, detail="Invalid secret_id") from e
-    except VaultLocked as e:
-        raise HTTPException(status_code=423, detail="Vault is locked") from e
-    except VaultSessionExpired as e:
-        raise HTTPException(status_code=401, detail="Vault session expired") from e
-    except VaultNotConfigured as e:
-        raise HTTPException(status_code=409, detail="Vault not configured") from e
-    except SecretDecryptionFailed as e:
-        raise HTTPException(status_code=422, detail="Secret decryption failed") from e
-    except InvalidSecretId as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except ExternalServiceFailed as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+    except (
+        VaultLocked,
+        VaultSessionExpired,
+        VaultNotConfigured,
+        SecretDecryptionFailed,
+        InvalidSecretId,
+        ExternalServiceFailed,
+    ) as exc:
+        _raise_allegro_http_error(exc)
 
 
 @router.get("/{secret_id}/matches", response_model=AllegroMatchResponse)
@@ -111,24 +130,18 @@ async def preview_matches(
         return map_match_preview_to_api(data)
     except ValueError as e:
         raise HTTPException(status_code=400, detail="Invalid secret_id") from e
-    except VaultLocked as e:
-        raise HTTPException(status_code=423, detail="Vault is locked") from e
-    except VaultSessionExpired as e:
-        raise HTTPException(status_code=401, detail="Vault session expired") from e
-    except VaultNotConfigured as e:
-        raise HTTPException(status_code=409, detail="Vault not configured") from e
-    except SecretDecryptionFailed as e:
-        raise HTTPException(status_code=422, detail="Secret decryption failed") from e
-    except InvalidSecretId as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except MatchesNotComputed as e:
-        raise HTTPException(status_code=400, detail="No match data found") from e
-    except TransactionNotFound as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except InvalidMatchSelection as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except ExternalServiceFailed as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+    except (
+        VaultLocked,
+        VaultSessionExpired,
+        VaultNotConfigured,
+        SecretDecryptionFailed,
+        InvalidSecretId,
+        MatchesNotComputed,
+        TransactionNotFound,
+        InvalidMatchSelection,
+        ExternalServiceFailed,
+    ) as exc:
+        _raise_allegro_http_error(exc)
 
 
 @router.post("/{secret_id}/apply", response_model=ApplyJobResponse)

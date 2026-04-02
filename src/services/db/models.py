@@ -143,6 +143,8 @@ class UserSecretORM(Base):
         Text,
         nullable=False,
     )
+    # Legacy transitional column kept for DB compatibility.
+    # New code must treat encrypted fields below as the source of truth.
 
     ciphertext: Mapped[bytes | None] = mapped_column(
         LargeBinary,

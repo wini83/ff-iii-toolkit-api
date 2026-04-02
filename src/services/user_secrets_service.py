@@ -23,7 +23,7 @@ class UserSecretsService:
     Application service for user-owned secrets.
 
     Plaintext secret material may leave this service only via
-    `get_decrypted_secret(...)` and only with an active vault session.
+    `get_secret_for_internal_use(...)` and only with an active vault session.
     """
 
     def __init__(
@@ -69,7 +69,7 @@ class UserSecretsService:
             user_id=user_id,
             type=type,
             alias=alias,
-            secret="",
+            secret="",  # Legacy transitional column; encrypted fields are authoritative.
             external_username=external_username,
             ciphertext=encrypted.ciphertext,
             secret_nonce=encrypted.secret_nonce,
@@ -90,27 +90,6 @@ class UserSecretsService:
         )
 
         return map_secret_to_domain_read_model(obj=obj)
-
-    def create(
-        self,
-        *,
-        actor_id: UUID,
-        user_id: UUID,
-        vault_session_id: str | None,
-        type: SecretType,
-        alias: str | None,
-        secret: str,
-        external_username: str | None = None,
-    ) -> UserSecretReadModel:
-        return self.create_secret(
-            actor_id=actor_id,
-            user_id=user_id,
-            vault_session_id=vault_session_id,
-            type=type,
-            alias=alias,
-            secret=secret,
-            external_username=external_username,
-        )
 
     def update_secret(
         self,
@@ -196,19 +175,6 @@ class UserSecretsService:
             target_id=secret_id,
         )
 
-    def delete(
-        self,
-        *,
-        actor_id: UUID,
-        user_id: UUID,
-        secret_id: UUID,
-    ) -> None:
-        self.delete_secret(
-            actor_id=actor_id,
-            user_id=user_id,
-            secret_id=secret_id,
-        )
-
     # -------------------------------------------------
     # Queries (SAFE)
     # -------------------------------------------------
@@ -222,14 +188,11 @@ class UserSecretsService:
 
         return map_secrets_to_domain_read_models(objs=secrets)
 
-    def list_for_user(self, *, user_id: UUID) -> list[UserSecretReadModel]:
-        return self.list_secrets(user_id=user_id)
-
     # -------------------------------------------------
     # Internal usage (non-API)
     # -------------------------------------------------
 
-    def get_decrypted_secret(
+    def get_secret_for_internal_use(
         self,
         *,
         secret_id: UUID,

@@ -194,7 +194,7 @@ def test_delete_secret_not_found():
     )
 
     with pytest.raises(SecretNotAccessible):
-        svc.delete(
+        svc.delete_secret(
             actor_id=uuid4(),
             user_id=uuid4(),
             secret_id=uuid4(),
@@ -214,7 +214,7 @@ def test_delete_secret_wrong_owner(secret_obj):
     )
 
     with pytest.raises(SecretNotAccessible):
-        svc.delete(
+        svc.delete_secret(
             actor_id=uuid4(),
             user_id=uuid4(),
             secret_id=secret_obj.id,
@@ -237,7 +237,7 @@ def test_delete_secret_happy_path(secret_obj):
     )
 
     actor_id = uuid4()
-    svc.delete(
+    svc.delete_secret(
         actor_id=actor_id,
         user_id=secret_obj.user_id,
         secret_id=secret_obj.id,
@@ -251,7 +251,7 @@ def test_delete_secret_happy_path(secret_obj):
     )
 
 
-def test_list_for_user_empty():
+def test_list_secrets_empty():
     secret_repo = MagicMock()
     audit_repo = MagicMock()
     secret_repo.get_for_user.return_value = []
@@ -263,12 +263,12 @@ def test_list_for_user_empty():
         crypto_service=MagicMock(),
     )
 
-    result = svc.list_for_user(user_id=uuid4())
+    result = svc.list_secrets(user_id=uuid4())
 
     assert result == []
 
 
-def test_list_for_user_maps(secret_obj):
+def test_list_secrets_maps(secret_obj):
     secret_repo = MagicMock()
     audit_repo = MagicMock()
     secret_repo.get_for_user.return_value = [secret_obj]
@@ -280,7 +280,7 @@ def test_list_for_user_maps(secret_obj):
         crypto_service=MagicMock(),
     )
 
-    result = svc.list_for_user(user_id=secret_obj.user_id)
+    result = svc.list_secrets(user_id=secret_obj.user_id)
 
     assert len(result) == 1
     assert result[0].id == secret_obj.id
@@ -301,7 +301,7 @@ def test_get_for_internal_use_not_found():
     )
 
     with pytest.raises(SecretNotAccessible):
-        svc.get_decrypted_secret(
+        svc.get_secret_for_internal_use(
             secret_id=uuid4(),
             user_id=uuid4(),
             vault_session_id="session-123",
@@ -322,7 +322,7 @@ def test_get_for_internal_use_wrong_owner(secret_obj):
     )
 
     with pytest.raises(SecretNotAccessible):
-        svc.get_decrypted_secret(
+        svc.get_secret_for_internal_use(
             secret_id=secret_obj.id,
             user_id=uuid4(),
             vault_session_id="session-123",
@@ -350,7 +350,7 @@ def test_get_for_internal_use_happy_path(secret_obj):
     )
 
     usage_meta = {"source": "unit-test"}
-    result = svc.get_decrypted_secret(
+    result = svc.get_secret_for_internal_use(
         secret_id=secret_obj.id,
         user_id=secret_obj.user_id,
         vault_session_id="session-123",
@@ -374,7 +374,7 @@ def test_get_for_internal_use_happy_path(secret_obj):
     assert result.secret == "decrypted-secret"
 
 
-def test_get_decrypted_secret_raises_for_legacy_plaintext_secret(secret_obj):
+def test_get_secret_for_internal_use_raises_for_legacy_plaintext_secret(secret_obj):
     secret_repo = MagicMock()
     audit_repo = MagicMock()
     vault_service = MagicMock()
@@ -399,7 +399,7 @@ def test_get_decrypted_secret_raises_for_legacy_plaintext_secret(secret_obj):
     )
 
     with pytest.raises(SecretDecryptionFailed):
-        svc.get_decrypted_secret(
+        svc.get_secret_for_internal_use(
             secret_id=secret_obj.id,
             user_id=secret_obj.user_id,
             vault_session_id="session-123",

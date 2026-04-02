@@ -59,7 +59,7 @@ class AllegroApplicationService:
             )
 
     def get_allegro_secrets(self, user_id: UUID) -> list[UserSecretReadModel]:
-        secrets = self.secrets_service.list_for_user(user_id=user_id)
+        secrets = self.secrets_service.list_secrets(user_id=user_id)
         allegro_secrets = [
             secret for secret in secrets if secret.type == SecretType.ALLEGRO
         ]
@@ -75,7 +75,7 @@ class AllegroApplicationService:
     ) -> AllegroOrderPayments:
         """Resolve the decrypted secret via UserSecretsService before external use."""
         try:
-            secret = self.secrets_service.get_decrypted_secret(
+            secret = self.secrets_service.get_secret_for_internal_use(
                 secret_id=secret_id,
                 user_id=user_id,
                 vault_session_id=vault_session_id,
