@@ -11,6 +11,7 @@ from services.db.models import (
     UserORM,
     UserPasswordSetTokenORM,
     UserSecretORM,
+    UserSecretVaultORM,
 )
 from services.domain.password_set_token import PasswordSetToken
 from services.domain.user import User
@@ -243,6 +244,50 @@ class UserSecretRepository:
     def delete(self, *, secret: UserSecretORM) -> None:
         self.db.delete(secret)
         self.db.flush()
+
+
+class UserSecretVaultRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def get_for_user(self, user_id: UUID) -> UserSecretVaultORM | None:
+        return self.db.get(UserSecretVaultORM, user_id)
+
+    def create(
+        self,
+        *,
+        user_id: UUID,
+        kdf_salt: bytes,
+        kdf_params_json: dict[str, int],
+        vault_check_ciphertext: bytes,
+        vault_check_nonce: bytes,
+    ) -> UserSecretVaultORM:
+        obj = UserSecretVaultORM(
+            user_id=user_id,
+            kdf_salt=kdf_salt,
+            kdf_params_json=kdf_params_json,
+            vault_check_ciphertext=vault_check_ciphertext,
+            vault_check_nonce=vault_check_nonce,
+        )
+        self.db.add(obj)
+        self.db.flush()
+        return obj
+
+    def update(
+        self,
+        *,
+        vault: UserSecretVaultORM,
+        kdf_salt: bytes,
+        kdf_params_json: dict[str, int],
+        vault_check_ciphertext: bytes,
+        vault_check_nonce: bytes,
+    ) -> UserSecretVaultORM:
+        vault.kdf_salt = kdf_salt
+        vault.kdf_params_json = kdf_params_json
+        vault.vault_check_ciphertext = vault_check_ciphertext
+        vault.vault_check_nonce = vault_check_nonce
+        self.db.flush()
+        return vault
 
 
 class PasswordSetTokenRepository:
