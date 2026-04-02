@@ -16,6 +16,7 @@ class UserSecretReadModel:
     id: UUID
     type: SecretType
     alias: str | None
+    external_username: str | None
     usage_count: int
     last_used_at: datetime | None
     created_at: datetime

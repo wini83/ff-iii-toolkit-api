@@ -2,7 +2,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, LargeBinary, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 
@@ -56,6 +56,12 @@ class UserORM(Base):
         "UserSecretORM",
         back_populates="user",
         cascade="all, delete-orphan",
+    )
+    secret_vault: Mapped["UserSecretVaultORM | None"] = relationship(
+        "UserSecretVaultORM",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        uselist=False,
     )
     password_set_tokens: Mapped[list["UserPasswordSetTokenORM"]] = relationship(
         "UserPasswordSetTokenORM",
@@ -128,12 +134,37 @@ class UserSecretORM(Base):
         nullable=True,
     )
 
+    external_username: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
     secret: Mapped[str] = mapped_column(
         Text,
         nullable=False,
     )
-    # MVP: plaintext
-    # next sprint: encrypt before persist
+
+    ciphertext: Mapped[bytes | None] = mapped_column(
+        LargeBinary,
+        nullable=True,
+    )
+
+    secret_nonce: Mapped[bytes | None] = mapped_column(
+        LargeBinary,
+        nullable=True,
+    )
+
+    wrapped_dek: Mapped[bytes | None] = mapped_column(
+        LargeBinary,
+        nullable=True,
+    )
+
+    wrapped_dek_nonce: Mapped[bytes | None] = mapped_column(
+        LargeBinary,
+        nullable=True,
+    )
+
+    crypto_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     usage_count: Mapped[int] = mapped_column(
         Integer,
@@ -168,6 +199,49 @@ class UserSecretORM(Base):
     user: Mapped["UserORM"] = relationship(
         "UserORM",
         back_populates="secrets",
+    )
+
+
+class UserSecretVaultORM(Base):
+    __tablename__ = "user_secret_vaults"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+        nullable=False,
+    )
+    kdf_salt: Mapped[bytes | None] = mapped_column(
+        LargeBinary,
+        nullable=True,
+    )
+    kdf_params_json: Mapped[dict | None] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+    vault_check_ciphertext: Mapped[bytes | None] = mapped_column(
+        LargeBinary,
+        nullable=True,
+    )
+    vault_check_nonce: Mapped[bytes | None] = mapped_column(
+        LargeBinary,
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    user: Mapped["UserORM"] = relationship(
+        "UserORM",
+        back_populates="secret_vault",
     )
 
 

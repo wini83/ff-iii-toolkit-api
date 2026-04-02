@@ -1,14 +1,39 @@
 repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-merge-conflict
+      - id: check-added-large-files
+
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    # Ruff version.
     rev: v0.14.14
     hooks:
-      # Run the linter.
       - id: ruff-check
-        args: [ --fix ]
-      # Run the formatter.
+        args: [--fix]
       - id: ruff-format
-  
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: uv run env PYTHONPATH=src mypy .
+        language: system
+        pass_filenames: false
+      - id: deptry
+        name: deptry
+        entry: uv run deptry .
+        language: system
+        pass_filenames: false
+      - id: pytest
+        name: pytest
+        entry: uv run pytest
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
   - repo: https://github.com/commitizen-tools/commitizen
     rev: v4.12.1
     hooks:

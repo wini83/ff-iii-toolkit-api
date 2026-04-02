@@ -184,12 +184,24 @@ class UserSecretRepository:
         type: SecretType,
         alias: str | None,
         secret: str,
+        external_username: str | None = None,
+        ciphertext: bytes | None = None,
+        secret_nonce: bytes | None = None,
+        wrapped_dek: bytes | None = None,
+        wrapped_dek_nonce: bytes | None = None,
+        crypto_version: int | None = None,
     ) -> UserSecretORM:
         obj = UserSecretORM(
             user_id=user_id,
             type=type.value if hasattr(type, "value") else type,
             alias=alias,
             secret=secret,
+            external_username=external_username,
+            ciphertext=ciphertext,
+            secret_nonce=secret_nonce,
+            wrapped_dek=wrapped_dek,
+            wrapped_dek_nonce=wrapped_dek_nonce,
+            crypto_version=crypto_version,
         )
         self.db.add(obj)
         self.db.flush()
