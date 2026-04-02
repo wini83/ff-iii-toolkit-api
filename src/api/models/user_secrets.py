@@ -20,6 +20,7 @@ def _normalize_alias(value: str | None) -> str | None:
 class CreateSecretPayload(BaseModel):
     type: SecretType
     alias: str | None = Field(default=None, max_length=MAX_SECRET_ALIAS_LENGTH)
+    external_username: str | None = None
     secret: str
 
     @field_validator("alias", mode="before")
@@ -27,11 +28,17 @@ class CreateSecretPayload(BaseModel):
     def normalize_alias(cls, value: str | None) -> str | None:
         return _normalize_alias(value)
 
+    @field_validator("external_username", mode="before")
+    @classmethod
+    def normalize_external_username(cls, value: str | None) -> str | None:
+        return _normalize_alias(value)
+
 
 class UserSecretResponse(BaseModel):
     id: UUID
     type: SecretType
     alias: str | None = None
+    external_username: str | None = None
     usage_count: int
     last_used_at: datetime | None
     created_at: datetime
@@ -41,10 +48,30 @@ class UserSecretResponse(BaseModel):
         return hashlib.sha1(str(self.id).encode()).hexdigest()[:8]
 
 
-class UpdateSecretAliasPayload(BaseModel):
+class UpdateSecretPayload(BaseModel):
     alias: str | None = Field(default=None, max_length=MAX_SECRET_ALIAS_LENGTH)
+    external_username: str | None = None
+    secret: str | None = None
 
     @field_validator("alias", mode="before")
     @classmethod
     def normalize_alias(cls, value: str | None) -> str | None:
         return _normalize_alias(value)
+
+    @field_validator("external_username", mode="before")
+    @classmethod
+    def normalize_external_username(cls, value: str | None) -> str | None:
+        return _normalize_alias(value)
+
+
+class UpdateSecretAliasPayload(UpdateSecretPayload):
+    pass
+
+
+class VaultPassphrasePayload(BaseModel):
+    passphrase: str = Field(min_length=1)
+
+
+class VaultStatusResponse(BaseModel):
+    configured: bool
+    unlocked: bool

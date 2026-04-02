@@ -3,10 +3,15 @@ repos:
     rev: v5.0.0
     hooks:
       - id: check-yaml
+        exclude: ^\.codex$
       - id: end-of-file-fixer
+        exclude: ^\.codex$
       - id: trailing-whitespace
+        exclude: ^\.codex$
       - id: check-merge-conflict
+        exclude: ^\.codex$
       - id: check-added-large-files
+        exclude: ^\.codex$
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.14.14

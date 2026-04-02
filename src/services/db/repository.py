@@ -15,6 +15,7 @@ from services.db.models import (
 )
 from services.domain.password_set_token import PasswordSetToken
 from services.domain.user import User
+from services.domain.user_secret_vault import EncryptedSecretBlob
 
 
 class UserRepository:
@@ -238,6 +239,36 @@ class UserSecretRepository:
         alias: str | None,
     ) -> UserSecretORM:
         secret.alias = alias
+        self.db.flush()
+        return secret
+
+    def update_metadata(
+        self,
+        *,
+        secret: UserSecretORM,
+        alias: str | None | object = ...,
+        external_username: str | None | object = ...,
+    ) -> UserSecretORM:
+        if alias is not ...:
+            secret.alias = alias
+        if external_username is not ...:
+            secret.external_username = external_username
+        self.db.flush()
+        return secret
+
+    def update_encrypted_secret(
+        self,
+        *,
+        secret: UserSecretORM,
+        encrypted: EncryptedSecretBlob,
+        plaintext_placeholder: str = "",
+    ) -> UserSecretORM:
+        secret.secret = plaintext_placeholder
+        secret.ciphertext = encrypted.ciphertext
+        secret.secret_nonce = encrypted.secret_nonce
+        secret.wrapped_dek = encrypted.wrapped_dek
+        secret.wrapped_dek_nonce = encrypted.wrapped_dek_nonce
+        secret.crypto_version = encrypted.crypto_version
         self.db.flush()
         return secret
 

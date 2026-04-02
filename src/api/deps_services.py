@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from fastapi import Depends
+from fastapi import Cookie, Depends, Header
 from ff_iii_luciferin.api import FireflyClient
 from sqlalchemy.orm import Session
 
@@ -10,10 +10,12 @@ from services.db.repository import (
     AuditLogRepository,
     UserRepository,
     UserSecretRepository,
+    UserSecretVaultRepository,
 )
 from services.firefly_base_service import FireflyBaseService
 from services.firefly_enrichment_service import FireflyEnrichmentService
 from services.firefly_tx_service import FireflyTxService
+from services.secret_crypto_service import SecretCryptoService
 from services.snapshot import (
     InMemorySnapshotStore,
     SnapshotAllegroMetricsService,
@@ -24,6 +26,8 @@ from services.snapshot import (
 )
 from services.system.bootstrap import BootstrapService
 from services.user_secrets_service import UserSecretsService
+from services.vault_service import VaultService
+from services.vault_session_store import VaultSessionStore
 from settings import settings
 
 
@@ -99,12 +103,50 @@ def get_snapshot_tx_metrics_service() -> SnapshotTxMetricsService:
     )
 
 
+@lru_cache(maxsize=1)
+def get_secret_crypto_service() -> SecretCryptoService:
+    return SecretCryptoService()
+
+
+@lru_cache(maxsize=1)
+def get_vault_session_store() -> VaultSessionStore:
+    return VaultSessionStore()
+
+
+def get_vault_service(
+    db: Session = Depends(get_db),
+) -> VaultService:
+    return VaultService(
+        vault_repo=UserSecretVaultRepository(db),
+        session_store=get_vault_session_store(),
+        crypto_service=get_secret_crypto_service(),
+        audit_repo=AuditLogRepository(db),
+        vault_session_ttl_seconds=settings.VAULT_SESSION_TTL_SECONDS,
+    )
+
+
+def get_vault_session_id(
+    vault_session_cookie: str | None = Cookie(
+        default=None,
+        alias=settings.VAULT_SESSION_COOKIE_NAME,
+    ),
+    vault_session_header: str | None = Header(
+        default=None,
+        alias="X-Vault-Session-Id",
+    ),
+) -> str | None:
+    return vault_session_cookie or vault_session_header
+
+
 def get_user_secrets_service(
     db: Session = Depends(get_db),
+    vault_service: VaultService = Depends(get_vault_service),
 ) -> UserSecretsService:
     return UserSecretsService(
         secret_repo=UserSecretRepository(db),
         audit_repo=AuditLogRepository(db),
+        vault_service=vault_service,
+        crypto_service=get_secret_crypto_service(),
     )
 
 

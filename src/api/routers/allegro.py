@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.deps_runtime import get_allegro_application_runtime
+from api.deps_services import get_vault_session_id
 from api.mappers.allegro import (
     map_allegro_metrics_state_to_response,
     map_allegro_payments_to_response,
@@ -27,7 +28,11 @@ from services.exceptions import (
     InvalidMatchSelection,
     InvalidSecretId,
     MatchesNotComputed,
+    SecretDecryptionFailed,
     TransactionNotFound,
+    VaultLocked,
+    VaultNotConfigured,
+    VaultSessionExpired,
 )
 from services.guards import require_active_user
 
@@ -58,6 +63,7 @@ def fetch_for_id(
     limit: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     user_id: UUID = Depends(require_active_user),
+    vault_session_id: str | None = Depends(get_vault_session_id),
     svc: AllegroApplicationService = Depends(get_allegro_application_runtime),
 ):
     page = AllegroPageRequest(limit=limit, offset=offset)
@@ -65,11 +71,20 @@ def fetch_for_id(
         payments = svc.fetch_allegro_data(
             user_id=user_id,
             secret_id=UUID(secret_id),
+            vault_session_id=vault_session_id,
             page=page,
         )
         return map_allegro_payments_to_response(payments)
     except ValueError as e:
         raise HTTPException(status_code=400, detail="Invalid secret_id") from e
+    except VaultLocked as e:
+        raise HTTPException(status_code=423, detail="Vault is locked") from e
+    except VaultSessionExpired as e:
+        raise HTTPException(status_code=401, detail="Vault session expired") from e
+    except VaultNotConfigured as e:
+        raise HTTPException(status_code=409, detail="Vault not configured") from e
+    except SecretDecryptionFailed as e:
+        raise HTTPException(status_code=422, detail="Secret decryption failed") from e
     except InvalidSecretId as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except ExternalServiceFailed as e:
@@ -82,6 +97,7 @@ async def preview_matches(
     limit: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     user_id: UUID = Depends(require_active_user),
+    vault_session_id: str | None = Depends(get_vault_session_id),
     svc: AllegroApplicationService = Depends(get_allegro_application_runtime),
 ):
     page = AllegroPageRequest(limit=limit, offset=offset)
@@ -89,11 +105,20 @@ async def preview_matches(
         data = await svc.preview_matches(
             user_id=user_id,
             secret_id=UUID(secret_id),
+            vault_session_id=vault_session_id,
             page=page,
         )
         return map_match_preview_to_api(data)
     except ValueError as e:
         raise HTTPException(status_code=400, detail="Invalid secret_id") from e
+    except VaultLocked as e:
+        raise HTTPException(status_code=423, detail="Vault is locked") from e
+    except VaultSessionExpired as e:
+        raise HTTPException(status_code=401, detail="Vault session expired") from e
+    except VaultNotConfigured as e:
+        raise HTTPException(status_code=409, detail="Vault not configured") from e
+    except SecretDecryptionFailed as e:
+        raise HTTPException(status_code=422, detail="Secret decryption failed") from e
     except InvalidSecretId as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except MatchesNotComputed as e:

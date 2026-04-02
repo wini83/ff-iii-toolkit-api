@@ -74,6 +74,9 @@ class VaultService:
         self._log(actor_id=user_id, action="vault.lock")
         self._commit()
 
+    def is_configured(self, user_id: UUID) -> bool:
+        return self.vault_repo.get_for_user(user_id) is not None
+
     def is_unlocked(self, user_id: UUID, vault_session_id: str | None) -> bool:
         if vault_session_id is None:
             return False
