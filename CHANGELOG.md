@@ -1,3 +1,9 @@
+## v2.12.0 (2026-04-03)
+
+### Feat
+
+- introduce encrypted user secrets with vault session flow & add internal transaction snapshot refresh endpoint
+
 ## v2.11.2 (2026-03-29)
 
 ### Refactor
