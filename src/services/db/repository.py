@@ -185,7 +185,6 @@ class UserSecretRepository:
         user_id: UUID,
         type: SecretType,
         alias: str | None,
-        secret: str,
         external_username: str | None = None,
         ciphertext: bytes | None = None,
         secret_nonce: bytes | None = None,
@@ -197,7 +196,6 @@ class UserSecretRepository:
             user_id=user_id,
             type=type.value if hasattr(type, "value") else type,
             alias=alias,
-            secret=secret,
             external_username=external_username,
             ciphertext=ciphertext,
             secret_nonce=secret_nonce,
@@ -261,9 +259,7 @@ class UserSecretRepository:
         *,
         secret: UserSecretORM,
         encrypted: EncryptedSecretBlob,
-        plaintext_placeholder: str = "",
     ) -> UserSecretORM:
-        secret.secret = plaintext_placeholder
         secret.ciphertext = encrypted.ciphertext
         secret.secret_nonce = encrypted.secret_nonce
         secret.wrapped_dek = encrypted.wrapped_dek

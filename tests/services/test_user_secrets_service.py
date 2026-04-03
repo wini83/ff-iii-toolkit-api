@@ -74,7 +74,6 @@ def test_create_secret_happy_path(secret_obj):
         user_id=user_id,
         type=SecretType.ALLEGRO,
         alias="shop",
-        secret="",
         external_username="shop-user",
         ciphertext=b"ciphertext",
         secret_nonce=b"secret-nonce",

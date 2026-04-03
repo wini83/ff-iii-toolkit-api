@@ -69,7 +69,6 @@ class UserSecretsService:
             user_id=user_id,
             type=type,
             alias=alias,
-            secret="",  # Legacy transitional column; encrypted fields are authoritative.
             external_username=external_username,
             ciphertext=encrypted.ciphertext,
             secret_nonce=encrypted.secret_nonce,
