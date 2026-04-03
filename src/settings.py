@@ -20,6 +20,7 @@ class Settings(BaseSettings):
 
     SECRET_KEY: str  # = Field(..., env="SECRET_KEY")
     PASSWORD_SET_TOKEN_PEPPER: str | None = None
+    INTERNAL_API_KEY: str | None = None
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     PASSWORD_SET_TOKEN_EXPIRE_HOURS: int = 24
