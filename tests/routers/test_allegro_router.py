@@ -80,12 +80,12 @@ class FakeAllegroSvc:
     def get_allegro_secrets(self, *, user_id):
         return self._secrets
 
-    def fetch_allegro_data(self, *, user_id, secret_id, page):
+    def fetch_allegro_data(self, *, user_id, secret_id, vault_session_id, page):
         if self._fetch_error:
             raise self._fetch_error
         return self._payments
 
-    async def preview_matches(self, *, user_id, secret_id, page):
+    async def preview_matches(self, *, user_id, secret_id, vault_session_id, page):
         if self._matches_error:
             raise self._matches_error
         return self._matches

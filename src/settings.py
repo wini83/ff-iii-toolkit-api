@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     REFRESH_COOKIE_NAME: str = "refresh_token"
     REFRESH_TOKEN_SECURE: bool = False
+    VAULT_SESSION_COOKIE_NAME: str = "vault_session_id"
+    VAULT_SESSION_TTL_SECONDS: int = 900
+    VAULT_SESSION_SECURE: bool = False
     log_level: str = "INFO"
     database_url: str = "sqlite:///./data/app.db"
 

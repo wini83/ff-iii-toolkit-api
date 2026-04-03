@@ -4,7 +4,6 @@ from uuid import uuid4
 
 from services.domain.user_secrets import SecretType
 from services.mappers.user_secrets import (
-    map_secret_to_domain_model,
     map_secret_to_domain_read_model,
     map_secrets_to_domain_read_models,
 )
@@ -46,11 +45,3 @@ def test_map_secrets_to_domain_read_models():
     assert result[0].id == obj.id
     assert result[0].type == obj.type
     assert result[0].alias == obj.alias
-
-
-def test_map_secret_to_domain_model_includes_secret():
-    obj = _secret_obj()
-    result = map_secret_to_domain_model(obj)
-    assert result.id == obj.id
-    assert result.alias == obj.alias
-    assert result.secret == obj.secret

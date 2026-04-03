@@ -143,3 +143,4 @@ data/app.db
 *.patch
 
 sandbox/*
+.codex

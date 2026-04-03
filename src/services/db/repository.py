@@ -11,9 +11,11 @@ from services.db.models import (
     UserORM,
     UserPasswordSetTokenORM,
     UserSecretORM,
+    UserSecretVaultORM,
 )
 from services.domain.password_set_token import PasswordSetToken
 from services.domain.user import User
+from services.domain.user_secret_vault import EncryptedSecretBlob
 
 
 class UserRepository:
@@ -183,13 +185,23 @@ class UserSecretRepository:
         user_id: UUID,
         type: SecretType,
         alias: str | None,
-        secret: str,
+        external_username: str | None = None,
+        ciphertext: bytes | None = None,
+        secret_nonce: bytes | None = None,
+        wrapped_dek: bytes | None = None,
+        wrapped_dek_nonce: bytes | None = None,
+        crypto_version: int | None = None,
     ) -> UserSecretORM:
         obj = UserSecretORM(
             user_id=user_id,
             type=type.value if hasattr(type, "value") else type,
             alias=alias,
-            secret=secret,
+            external_username=external_username,
+            ciphertext=ciphertext,
+            secret_nonce=secret_nonce,
+            wrapped_dek=wrapped_dek,
+            wrapped_dek_nonce=wrapped_dek_nonce,
+            crypto_version=crypto_version,
         )
         self.db.add(obj)
         self.db.flush()
@@ -228,9 +240,81 @@ class UserSecretRepository:
         self.db.flush()
         return secret
 
+    def update_metadata(
+        self,
+        *,
+        secret: UserSecretORM,
+        alias: str | None | object = ...,
+        external_username: str | None | object = ...,
+    ) -> UserSecretORM:
+        if alias is not ...:
+            secret.alias = alias
+        if external_username is not ...:
+            secret.external_username = external_username
+        self.db.flush()
+        return secret
+
+    def update_encrypted_secret(
+        self,
+        *,
+        secret: UserSecretORM,
+        encrypted: EncryptedSecretBlob,
+    ) -> UserSecretORM:
+        secret.ciphertext = encrypted.ciphertext
+        secret.secret_nonce = encrypted.secret_nonce
+        secret.wrapped_dek = encrypted.wrapped_dek
+        secret.wrapped_dek_nonce = encrypted.wrapped_dek_nonce
+        secret.crypto_version = encrypted.crypto_version
+        self.db.flush()
+        return secret
+
     def delete(self, *, secret: UserSecretORM) -> None:
         self.db.delete(secret)
         self.db.flush()
+
+
+class UserSecretVaultRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def get_for_user(self, user_id: UUID) -> UserSecretVaultORM | None:
+        return self.db.get(UserSecretVaultORM, user_id)
+
+    def create(
+        self,
+        *,
+        user_id: UUID,
+        kdf_salt: bytes,
+        kdf_params_json: dict[str, int],
+        vault_check_ciphertext: bytes,
+        vault_check_nonce: bytes,
+    ) -> UserSecretVaultORM:
+        obj = UserSecretVaultORM(
+            user_id=user_id,
+            kdf_salt=kdf_salt,
+            kdf_params_json=kdf_params_json,
+            vault_check_ciphertext=vault_check_ciphertext,
+            vault_check_nonce=vault_check_nonce,
+        )
+        self.db.add(obj)
+        self.db.flush()
+        return obj
+
+    def update(
+        self,
+        *,
+        vault: UserSecretVaultORM,
+        kdf_salt: bytes,
+        kdf_params_json: dict[str, int],
+        vault_check_ciphertext: bytes,
+        vault_check_nonce: bytes,
+    ) -> UserSecretVaultORM:
+        vault.kdf_salt = kdf_salt
+        vault.kdf_params_json = kdf_params_json
+        vault.vault_check_ciphertext = vault_check_ciphertext
+        vault.vault_check_nonce = vault_check_nonce
+        self.db.flush()
+        return vault
 
 
 class PasswordSetTokenRepository:

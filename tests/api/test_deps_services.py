@@ -8,6 +8,7 @@ from services.allegro_service import AllegroService, allegro_client_factory
 from services.firefly_base_service import FireflyBaseService
 from services.firefly_enrichment_service import FireflyEnrichmentService
 from services.firefly_tx_service import FireflyTxService
+from services.secret_crypto_service import SecretCryptoService
 from services.snapshot import (
     InMemorySnapshotStore,
     SnapshotAllegroMetricsService,
@@ -17,6 +18,8 @@ from services.snapshot import (
 )
 from services.system.bootstrap import BootstrapService
 from services.user_secrets_service import UserSecretsService
+from services.vault_service import VaultService
+from services.vault_session_store import VaultSessionStore
 
 
 @pytest.fixture(autouse=True)
@@ -31,6 +34,8 @@ def clear_dependency_caches():
         deps_services.get_snapshot_blik_metrics_service,
         deps_services.get_snapshot_allegro_metrics_service,
         deps_services.get_snapshot_tx_metrics_service,
+        deps_services.get_secret_crypto_service,
+        deps_services.get_vault_session_store,
     ]:
         cache_clear = getattr(factory, "cache_clear", None)
         if cache_clear is not None:
@@ -212,12 +217,57 @@ def test_get_snapshot_tx_metrics_service_uses_both_filters(monkeypatch):
 
 def test_get_user_secrets_service_builds_repositories_from_db():
     db = MagicMock()
+    vault_service = deps_services.get_vault_service(db=db)
 
-    service = deps_services.get_user_secrets_service(db=db)
+    service = deps_services.get_user_secrets_service(
+        db=db,
+        vault_service=vault_service,
+    )
 
     assert isinstance(service, UserSecretsService)
     assert service.secret_repo.db is db
     assert service.audit_repo.db is db
+    assert service.vault_service.vault_repo.db is db
+    assert isinstance(service.crypto_service, SecretCryptoService)
+
+
+def test_get_secret_crypto_service_returns_cached_instance():
+    first = deps_services.get_secret_crypto_service()
+    second = deps_services.get_secret_crypto_service()
+
+    assert isinstance(first, SecretCryptoService)
+    assert first is second
+
+
+def test_get_vault_session_store_returns_cached_instance():
+    first = deps_services.get_vault_session_store()
+    second = deps_services.get_vault_session_store()
+
+    assert isinstance(first, VaultSessionStore)
+    assert first is second
+
+
+def test_get_vault_service_builds_repositories_from_db(monkeypatch):
+    db = MagicMock()
+    store = MagicMock()
+    crypto = MagicMock()
+
+    monkeypatch.setattr(deps_services, "get_vault_session_store", lambda: store)
+    monkeypatch.setattr(deps_services, "get_secret_crypto_service", lambda: crypto)
+    monkeypatch.setattr(
+        deps_services,
+        "settings",
+        SimpleNamespace(VAULT_SESSION_TTL_SECONDS=321),
+    )
+
+    service = deps_services.get_vault_service(db=db)
+
+    assert isinstance(service, VaultService)
+    assert service.vault_repo.db is db
+    assert service.session_store is store
+    assert service.crypto_service is crypto
+    assert service.audit_repo.db is db
+    assert service.vault_session_ttl_seconds == 321
 
 
 def test_get_bootstrap_service_builds_user_repository_from_db():
