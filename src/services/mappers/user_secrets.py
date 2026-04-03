@@ -1,5 +1,5 @@
 from services.db.models import UserSecretORM
-from services.domain.user_secrets import UserSecretModel, UserSecretReadModel
+from services.domain.user_secrets import UserSecretReadModel
 
 
 def map_secret_to_domain_read_model(obj: UserSecretORM) -> UserSecretReadModel:
@@ -7,6 +7,7 @@ def map_secret_to_domain_read_model(obj: UserSecretORM) -> UserSecretReadModel:
         id=obj.id,
         type=obj.type,
         alias=obj.alias,
+        external_username=getattr(obj, "external_username", None),
         usage_count=obj.usage_count,
         last_used_at=obj.last_used_at,
         created_at=obj.created_at,
@@ -21,21 +22,10 @@ def map_secrets_to_domain_read_models(
             id=obj.id,
             type=obj.type,
             alias=obj.alias,
+            external_username=getattr(obj, "external_username", None),
             usage_count=obj.usage_count,
             last_used_at=obj.last_used_at,
             created_at=obj.created_at,
         )
         for obj in objs
     ]
-
-
-def map_secret_to_domain_model(obj: UserSecretORM) -> UserSecretModel:
-    return UserSecretModel(
-        id=obj.id,
-        type=obj.type,
-        alias=obj.alias,
-        usage_count=obj.usage_count,
-        last_used_at=obj.last_used_at,
-        created_at=obj.created_at,
-        secret=obj.secret,
-    )

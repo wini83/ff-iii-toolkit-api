@@ -28,6 +28,17 @@ class TransactionSnapshotStatusResponse(BaseModel):
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class TransactionSnapshotRefreshResponse(BaseModel):
+    status: Literal["ok"]
+    refreshed: bool
+    ttl_seconds: int
+    snapshot_fetched_at: datetime
+    expires_at: datetime
+    transaction_count: int
+    schema_version: int
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
 class BootstrapResponse(BaseModel):
     bootstrapped: bool
 

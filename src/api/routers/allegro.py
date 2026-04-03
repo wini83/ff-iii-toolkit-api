@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.deps_runtime import get_allegro_application_runtime
+from api.deps_services import get_vault_session_id
 from api.mappers.allegro import (
     map_allegro_metrics_state_to_response,
     map_allegro_payments_to_response,
@@ -27,7 +28,11 @@ from services.exceptions import (
     InvalidMatchSelection,
     InvalidSecretId,
     MatchesNotComputed,
+    SecretDecryptionFailed,
     TransactionNotFound,
+    VaultLocked,
+    VaultNotConfigured,
+    VaultSessionExpired,
 )
 from services.guards import require_active_user
 
@@ -37,6 +42,28 @@ router = APIRouter(
     dependencies=[Depends(require_active_user)],
 )
 logger = logging.getLogger(__name__)
+
+
+def _raise_allegro_http_error(exc: Exception) -> None:
+    if isinstance(exc, VaultLocked):
+        raise HTTPException(status_code=423, detail="Vault is locked") from exc
+    if isinstance(exc, VaultSessionExpired):
+        raise HTTPException(status_code=401, detail="Vault session expired") from exc
+    if isinstance(exc, VaultNotConfigured):
+        raise HTTPException(status_code=409, detail="Vault not configured") from exc
+    if isinstance(exc, SecretDecryptionFailed):
+        raise HTTPException(status_code=422, detail="Secret decryption failed") from exc
+    if isinstance(exc, InvalidSecretId):
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if isinstance(exc, MatchesNotComputed):
+        raise HTTPException(status_code=400, detail="No match data found") from exc
+    if isinstance(exc, TransactionNotFound):
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if isinstance(exc, InvalidMatchSelection):
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if isinstance(exc, ExternalServiceFailed):
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    raise exc
 
 
 # --------------------------------------------------
@@ -58,6 +85,7 @@ def fetch_for_id(
     limit: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     user_id: UUID = Depends(require_active_user),
+    vault_session_id: str | None = Depends(get_vault_session_id),
     svc: AllegroApplicationService = Depends(get_allegro_application_runtime),
 ):
     page = AllegroPageRequest(limit=limit, offset=offset)
@@ -65,15 +93,21 @@ def fetch_for_id(
         payments = svc.fetch_allegro_data(
             user_id=user_id,
             secret_id=UUID(secret_id),
+            vault_session_id=vault_session_id,
             page=page,
         )
         return map_allegro_payments_to_response(payments)
     except ValueError as e:
         raise HTTPException(status_code=400, detail="Invalid secret_id") from e
-    except InvalidSecretId as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except ExternalServiceFailed as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+    except (
+        VaultLocked,
+        VaultSessionExpired,
+        VaultNotConfigured,
+        SecretDecryptionFailed,
+        InvalidSecretId,
+        ExternalServiceFailed,
+    ) as exc:
+        _raise_allegro_http_error(exc)
 
 
 @router.get("/{secret_id}/matches", response_model=AllegroMatchResponse)
@@ -82,6 +116,7 @@ async def preview_matches(
     limit: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     user_id: UUID = Depends(require_active_user),
+    vault_session_id: str | None = Depends(get_vault_session_id),
     svc: AllegroApplicationService = Depends(get_allegro_application_runtime),
 ):
     page = AllegroPageRequest(limit=limit, offset=offset)
@@ -89,21 +124,24 @@ async def preview_matches(
         data = await svc.preview_matches(
             user_id=user_id,
             secret_id=UUID(secret_id),
+            vault_session_id=vault_session_id,
             page=page,
         )
         return map_match_preview_to_api(data)
     except ValueError as e:
         raise HTTPException(status_code=400, detail="Invalid secret_id") from e
-    except InvalidSecretId as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except MatchesNotComputed as e:
-        raise HTTPException(status_code=400, detail="No match data found") from e
-    except TransactionNotFound as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except InvalidMatchSelection as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except ExternalServiceFailed as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+    except (
+        VaultLocked,
+        VaultSessionExpired,
+        VaultNotConfigured,
+        SecretDecryptionFailed,
+        InvalidSecretId,
+        MatchesNotComputed,
+        TransactionNotFound,
+        InvalidMatchSelection,
+        ExternalServiceFailed,
+    ) as exc:
+        _raise_allegro_http_error(exc)
 
 
 @router.post("/{secret_id}/apply", response_model=ApplyJobResponse)

@@ -23,6 +23,7 @@ from services.exceptions import (
     ExternalServiceFailed,
     InvalidSecretId,
     MatchesNotComputed,
+    SecretNotAccessible,
 )
 from services.tx_stats.models import MetricsState
 
@@ -81,7 +82,7 @@ def test_get_allegro_secrets_filters_only_allegro():
     service = _service()
     allegro_secret = SimpleNamespace(type=SecretType.ALLEGRO)
     blik_secret = SimpleNamespace(type=SecretType.AMAZON)
-    service.secrets_service.list_for_user.return_value = [allegro_secret, blik_secret]
+    service.secrets_service.list_secrets.return_value = [allegro_secret, blik_secret]
 
     secrets = service.get_allegro_secrets(user_id=uuid4())
 
@@ -90,12 +91,15 @@ def test_get_allegro_secrets_filters_only_allegro():
 
 def test_fetch_allegro_data_wraps_missing_secret():
     service = _service()
-    service.secrets_service.get_for_internal_use.side_effect = RuntimeError("missing")
+    service.secrets_service.get_secret_for_internal_use.side_effect = (
+        SecretNotAccessible("missing")
+    )
 
     with pytest.raises(InvalidSecretId, match="Secret with id"):
         service.fetch_allegro_data(
             user_id=uuid4(),
             secret_id=uuid4(),
+            vault_session_id="session-123",
             page=AllegroPageRequest(),
         )
 
@@ -103,13 +107,14 @@ def test_fetch_allegro_data_wraps_missing_secret():
 def test_fetch_allegro_data_wraps_external_error():
     service = _service()
     secret = SimpleNamespace(secret="cookie", id=uuid4())
-    service.secrets_service.get_for_internal_use.return_value = secret
+    service.secrets_service.get_secret_for_internal_use.return_value = secret
     service.allegro_service.fetch.side_effect = RuntimeError("upstream")
 
     with pytest.raises(ExternalServiceFailed, match="Failed to fetch allegro data"):
         service.fetch_allegro_data(
             user_id=uuid4(),
             secret_id=uuid4(),
+            vault_session_id="session-123",
             page=AllegroPageRequest(),
         )
 
@@ -123,7 +128,10 @@ async def test_preview_matches_uses_unknown_login_for_empty_payments():
     service.enrichment_service.match_with_unmatched = AsyncMock(return_value=([], []))
 
     result = await service.preview_matches(
-        user_id=uuid4(), secret_id=secret_id, page=page
+        user_id=uuid4(),
+        secret_id=secret_id,
+        vault_session_id="session-123",
+        page=page,
     )
 
     assert result.login == "unknown"
@@ -155,7 +163,10 @@ async def test_preview_matches_returns_unmatched_payments():
     )
 
     result = await service.preview_matches(
-        user_id=uuid4(), secret_id=secret_id, page=page
+        user_id=uuid4(),
+        secret_id=secret_id,
+        vault_session_id="session-123",
+        page=page,
     )
 
     assert result.unmatched_payments == [unmatched_payment]
@@ -358,7 +369,12 @@ async def test_preview_matches_fetches_and_caches_only_requested_page():
         )
     )
 
-    await service.preview_matches(user_id=uuid4(), secret_id=secret_id, page=page)
+    await service.preview_matches(
+        user_id=uuid4(),
+        secret_id=secret_id,
+        vault_session_id="session-123",
+        page=page,
+    )
 
     service.fetch_allegro_data.assert_called_once()
     call = service.fetch_allegro_data.call_args

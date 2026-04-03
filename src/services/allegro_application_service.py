@@ -27,6 +27,7 @@ from services.exceptions import (
     InvalidMatchSelection,
     InvalidSecretId,
     MatchesNotComputed,
+    SecretNotAccessible,
     TransactionNotFound,
 )
 from services.firefly_base_service import FireflyServiceError
@@ -58,7 +59,7 @@ class AllegroApplicationService:
             )
 
     def get_allegro_secrets(self, user_id: UUID) -> list[UserSecretReadModel]:
-        secrets = self.secrets_service.list_for_user(user_id=user_id)
+        secrets = self.secrets_service.list_secrets(user_id=user_id)
         allegro_secrets = [
             secret for secret in secrets if secret.type == SecretType.ALLEGRO
         ]
@@ -69,13 +70,17 @@ class AllegroApplicationService:
         *,
         user_id: UUID,
         secret_id: UUID,
+        vault_session_id: str | None,
         page: AllegroPageRequest,
     ) -> AllegroOrderPayments:
+        """Resolve the decrypted secret via UserSecretsService before external use."""
         try:
-            secret = self.secrets_service.get_for_internal_use(
-                secret_id=secret_id, user_id=user_id
+            secret = self.secrets_service.get_secret_for_internal_use(
+                secret_id=secret_id,
+                user_id=user_id,
+                vault_session_id=vault_session_id,
             )
-        except Exception as e:
+        except SecretNotAccessible as e:
             raise InvalidSecretId(
                 f"Secret with id {secret_id} not found for user {user_id}"
             ) from e
@@ -130,12 +135,14 @@ class AllegroApplicationService:
         *,
         user_id: UUID,
         secret_id: UUID,
+        vault_session_id: str | None,
         page: AllegroPageRequest | None = None,
     ) -> AllegroMatchPreview:
         page_request = page or AllegroPageRequest()
         payments = self.fetch_allegro_data(
             user_id=user_id,
             secret_id=secret_id,
+            vault_session_id=vault_session_id,
             page=page_request,
         )
 

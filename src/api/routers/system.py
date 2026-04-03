@@ -1,3 +1,4 @@
+import logging
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -13,14 +14,36 @@ from api.models.system import (
     BootstrapPayload,
     BootstrapResponse,
     HealthResponse,
+    TransactionSnapshotRefreshResponse,
     TransactionSnapshotStatusResponse,
     VersionResponse,
 )
 from services.db.passwords import hash_password
+from services.guards import require_internal_api_key
 from services.snapshot import TransactionSnapshotService
+from services.snapshot.models import TransactionSnapshot
 from services.system.bootstrap import BootstrapAlreadyDone, BootstrapService
 
 router = APIRouter(prefix="/api/system", tags=["system"])
+logger = logging.getLogger(__name__)
+
+
+def _build_transaction_snapshot_status_response(
+    snapshot_service: TransactionSnapshotService,
+    snapshot: TransactionSnapshot,
+    *,
+    is_stale: bool,
+) -> TransactionSnapshotStatusResponse:
+    return TransactionSnapshotStatusResponse(
+        ttl_seconds=snapshot_service.max_age_seconds,
+        has_snapshot=True,
+        snapshot_fetched_at=snapshot.fetched_at,
+        expires_at=snapshot.fetched_at
+        + timedelta(seconds=snapshot_service.max_age_seconds),
+        is_stale=is_stale,
+        transaction_count=snapshot.transaction_count,
+        schema_version=snapshot.schema_version,
+    )
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -75,13 +98,38 @@ async def transaction_snapshot_status(
 
     is_stale = await snapshot_service.store.is_stale(snapshot_service.max_age_seconds)
 
-    return TransactionSnapshotStatusResponse(
+    return _build_transaction_snapshot_status_response(
+        snapshot_service,
+        snapshot,
+        is_stale=is_stale,
+    )
+
+
+@router.post(
+    "/transaction-snapshot/refresh",
+    response_model=TransactionSnapshotRefreshResponse,
+    dependencies=[Depends(require_internal_api_key)],
+)
+async def refresh_transaction_snapshot(
+    snapshot_service: TransactionSnapshotService = Depends(
+        get_transaction_snapshot_service
+    ),
+):
+    snapshot = await snapshot_service.refresh_snapshot()
+    logger.info(
+        "Transaction snapshot refreshed via internal endpoint",
+        extra={
+            "transaction_count": snapshot.transaction_count,
+            "schema_version": snapshot.schema_version,
+        },
+    )
+    return TransactionSnapshotRefreshResponse(
+        status="ok",
+        refreshed=True,
         ttl_seconds=snapshot_service.max_age_seconds,
-        has_snapshot=True,
         snapshot_fetched_at=snapshot.fetched_at,
         expires_at=snapshot.fetched_at
         + timedelta(seconds=snapshot_service.max_age_seconds),
-        is_stale=is_stale,
         transaction_count=snapshot.transaction_count,
         schema_version=snapshot.schema_version,
     )
