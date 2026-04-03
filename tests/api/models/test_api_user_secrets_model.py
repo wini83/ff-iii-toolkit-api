@@ -9,6 +9,7 @@ from api.models.user_secrets import (
     CreateSecretPayload,
     UpdateSecretPayload,
     UserSecretResponse,
+    VaultStatusResponse,
 )
 from services.domain.user_secrets import SecretType
 
@@ -64,3 +65,13 @@ def test_create_secret_payload_rejects_alias_longer_than_limit():
             alias="x" * (MAX_SECRET_ALIAS_LENGTH + 1),
             secret="s1",
         )
+
+
+def test_vault_status_response_accepts_optional_expires_at():
+    status = VaultStatusResponse(
+        configured=True,
+        unlocked=True,
+        expires_at=datetime(2025, 1, 1, tzinfo=UTC),
+    )
+
+    assert status.expires_at == datetime(2025, 1, 1, tzinfo=UTC)

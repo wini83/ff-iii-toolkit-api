@@ -82,7 +82,7 @@ def setup_vault(
         service.setup_vault(user_id, payload.passphrase)
     except VaultAlreadyConfigured as exc:
         _raise_user_secret_http_error(exc)
-    return VaultStatusResponse(configured=True, unlocked=False)
+    return VaultStatusResponse(configured=True, unlocked=False, expires_at=None)
 
 
 @router.post("/vault/unlock", response_model=VaultStatusResponse)
@@ -98,7 +98,11 @@ def unlock_vault(
         _raise_user_secret_http_error(exc)
 
     _set_vault_session_cookie(response, vault_session_id)
-    return VaultStatusResponse(configured=True, unlocked=True)
+    return VaultStatusResponse(
+        configured=True,
+        unlocked=True,
+        expires_at=service.get_session_expires_at(user_id, vault_session_id),
+    )
 
 
 @router.post("/vault/lock", response_model=VaultStatusResponse)
@@ -114,6 +118,7 @@ def lock_vault(
     return VaultStatusResponse(
         configured=service.is_configured(user_id),
         unlocked=False,
+        expires_at=None,
     )
 
 
@@ -125,7 +130,15 @@ def get_vault_status(
 ):
     configured = service.is_configured(user_id)
     unlocked = configured and service.is_unlocked(user_id, vault_session_id)
-    return VaultStatusResponse(configured=configured, unlocked=unlocked)
+    return VaultStatusResponse(
+        configured=configured,
+        unlocked=unlocked,
+        expires_at=(
+            service.get_session_expires_at(user_id, vault_session_id)
+            if unlocked
+            else None
+        ),
+    )
 
 
 @router.post("", response_model=UserSecretResponse, status_code=status.HTTP_201_CREATED)

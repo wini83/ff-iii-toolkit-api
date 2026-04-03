@@ -34,6 +34,13 @@ class VaultSessionStore:
                 return None
             return session.user_key
 
+    def get_expires_at(self, user_id: UUID, session_id: str) -> datetime | None:
+        with self._lock:
+            session = self._get_active_session(user_id=user_id, session_id=session_id)
+            if session is None:
+                return None
+            return session.expires_at
+
     def invalidate(self, user_id: UUID, session_id: str) -> None:
         with self._lock:
             sessions = self._sessions.get(user_id)

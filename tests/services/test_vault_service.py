@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 from uuid import uuid4
@@ -206,6 +207,32 @@ def test_is_unlocked_reflects_session_store():
     )
 
     assert service.is_unlocked(user_id, "session-123") is True
+
+
+def test_get_session_expires_at_returns_none_without_session_id():
+    service = VaultService(
+        vault_repo=MagicMock(),
+        session_store=MagicMock(),
+        crypto_service=MagicMock(),
+        audit_repo=MagicMock(),
+    )
+
+    assert service.get_session_expires_at(uuid4(), None) is None
+
+
+def test_get_session_expires_at_reflects_session_store():
+    user_id = uuid4()
+    expires_at = datetime(2026, 1, 1, tzinfo=UTC)
+    session_store = MagicMock()
+    session_store.get_expires_at.return_value = expires_at
+    service = VaultService(
+        vault_repo=MagicMock(),
+        session_store=session_store,
+        crypto_service=MagicMock(),
+        audit_repo=MagicMock(),
+    )
+
+    assert service.get_session_expires_at(user_id, "session-123") == expires_at
 
 
 def test_require_user_key_raises_when_vault_not_configured():

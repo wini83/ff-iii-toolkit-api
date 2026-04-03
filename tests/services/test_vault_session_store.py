@@ -13,11 +13,13 @@ def test_create_get_and_invalidate_session():
     session_id = store.create(user_id, b"user-key", ttl_seconds=60)
 
     assert store.get_user_key(user_id, session_id) == b"user-key"
+    assert store.get_expires_at(user_id, session_id) is not None
     assert store.get_user_key(other_user_id, session_id) is None
 
     store.invalidate(user_id, session_id)
 
     assert store.get_user_key(user_id, session_id) is None
+    assert store.get_expires_at(user_id, session_id) is None
 
 
 def test_invalidate_all_for_user_removes_only_that_users_sessions():

@@ -1,3 +1,4 @@
+from datetime import datetime
 from uuid import UUID
 
 from services.db.models import UserSecretVaultORM
@@ -81,6 +82,13 @@ class VaultService:
         if vault_session_id is None:
             return False
         return self.session_store.get_user_key(user_id, vault_session_id) is not None
+
+    def get_session_expires_at(
+        self, user_id: UUID, vault_session_id: str | None
+    ) -> datetime | None:
+        if vault_session_id is None:
+            return None
+        return self.session_store.get_expires_at(user_id, vault_session_id)
 
     def require_user_key(self, user_id: UUID, vault_session_id: str | None) -> bytes:
         self._get_vault_or_raise(user_id)

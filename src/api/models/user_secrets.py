@@ -71,3 +71,4 @@ class VaultPassphrasePayload(BaseModel):
 class VaultStatusResponse(BaseModel):
     configured: bool
     unlocked: bool
+    expires_at: datetime | None = None

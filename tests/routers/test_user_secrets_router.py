@@ -40,7 +40,11 @@ def test_vault_status_setup_unlock_and_lock_flow(client, db):
 
     initial_status = client.get("/api/user-secrets/vault/status", headers=headers)
     assert initial_status.status_code == 200
-    assert initial_status.json() == {"configured": False, "unlocked": False}
+    assert initial_status.json() == {
+        "configured": False,
+        "unlocked": False,
+        "expires_at": None,
+    }
 
     setup_response = client.post(
         "/api/user-secrets/vault/setup",
@@ -48,7 +52,11 @@ def test_vault_status_setup_unlock_and_lock_flow(client, db):
         json={"passphrase": "vault-pass"},
     )
     assert setup_response.status_code == 200
-    assert setup_response.json() == {"configured": True, "unlocked": False}
+    assert setup_response.json() == {
+        "configured": True,
+        "unlocked": False,
+        "expires_at": None,
+    }
 
     unlock_response = client.post(
         "/api/user-secrets/vault/unlock",
@@ -56,16 +64,26 @@ def test_vault_status_setup_unlock_and_lock_flow(client, db):
         json={"passphrase": "vault-pass"},
     )
     assert unlock_response.status_code == 200
-    assert unlock_response.json() == {"configured": True, "unlocked": True}
+    unlock_body = unlock_response.json()
+    assert unlock_body["configured"] is True
+    assert unlock_body["unlocked"] is True
+    assert unlock_body["expires_at"] is not None
     assert "vault_session_id" in client.cookies
 
     unlocked_status = client.get("/api/user-secrets/vault/status", headers=headers)
     assert unlocked_status.status_code == 200
-    assert unlocked_status.json() == {"configured": True, "unlocked": True}
+    unlocked_body = unlocked_status.json()
+    assert unlocked_body["configured"] is True
+    assert unlocked_body["unlocked"] is True
+    assert unlocked_body["expires_at"] is not None
 
     lock_response = client.post("/api/user-secrets/vault/lock", headers=headers)
     assert lock_response.status_code == 200
-    assert lock_response.json() == {"configured": True, "unlocked": False}
+    assert lock_response.json() == {
+        "configured": True,
+        "unlocked": False,
+        "expires_at": None,
+    }
     assert "vault_session_id" not in client.cookies
 
 
