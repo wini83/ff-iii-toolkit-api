@@ -38,16 +38,28 @@ class BankRecord(BaseMatchItem, Evidence):
             return True
 
         lines: list[str] = []
+        hidden_currency_fields = {"account_currency", "operation_currency"}
 
         for f in fields(self):
             name = f.name
             value = getattr(self, name)
 
+            if name in hidden_currency_fields:
+                continue
+
             if include is not None:
                 if name not in include:
                     continue
-            elif name in exclude or (only_meaningful and not is_meaningful(value)):
+            elif name in exclude:
                 continue
+
+            if only_meaningful and not is_meaningful(value):
+                continue
+
+            if name == "amount":
+                value = f"{value} {self.account_currency}"
+            elif name == "operation_amount":
+                value = f"{value} {self.operation_currency}"
 
             lines.append(f"{name}: {value}")
 
