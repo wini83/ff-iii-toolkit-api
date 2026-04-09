@@ -1,18 +1,18 @@
 from dataclasses import dataclass
 from decimal import Decimal
-from enum import Enum
+from enum import StrEnum
 
 from services.domain.base import BaseMatchItem
 
 
-class TxTag(str, Enum):
+class TxTag(StrEnum):
     blik_done = "blik_done"
     allegro_done = "allegro_done"
     rule_p = "rule_potential"
     action_req = "action_req"
 
 
-class TxType(str, Enum):
+class TxType(StrEnum):
     WITHDRAWAL = "withdrawal"
     DEPOSIT = "deposit"
     TRANSFER = "transfer"

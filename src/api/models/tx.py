@@ -1,5 +1,5 @@
 from datetime import date
-from enum import Enum
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel
@@ -45,13 +45,13 @@ class ScreeningMonthResponse(BaseModel):
     categories: list[SimplifiedCategory]
 
 
-class TxTag(str, Enum):
+class TxTag(StrEnum):
     blik_done = "blik_done"
     allegro_done = "allegro_done"
     rule_p = "rule_potential"
     action_req = "action_req"
 
 
-class MatchProcessingStatus(str, Enum):
+class MatchProcessingStatus(StrEnum):
     NEW = "new"
     ALREADY_PROCESSED = "already_processed"
