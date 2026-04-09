@@ -1,10 +1,10 @@
 from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from uuid import UUID
 
 
-class SecretType(str, Enum):
+class SecretType(StrEnum):
     ALLEGRO = "allegro"
     AMAZON = "amazon"
     SESSION = "session"

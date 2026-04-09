@@ -1,10 +1,10 @@
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 from services.domain.base import Matchable
 
 
-class MatchProcessingStatus(str, Enum):
+class MatchProcessingStatus(StrEnum):
     NEW = "new"
     ALREADY_PROCESSED = "already_processed"
 
