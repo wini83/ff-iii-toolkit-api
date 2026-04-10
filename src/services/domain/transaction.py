@@ -18,10 +18,30 @@ class TxType(StrEnum):
     TRANSFER = "transfer"
 
 
+class AccountType(StrEnum):
+    ASSET = "asset"
+    EXPENSE = "expense"
+    REVENUE = "revenue"
+    LIABILITY = "liability"
+    LOAN = "loan"
+    DEBT = "debt"
+    MORTGAGE = "mortgage"
+    INITIAL_BALANCE = "initial-balance"
+    RECONCILIATION = "reconciliation"
+
+
 @dataclass
 class Category:
     id: int
     name: str
+
+
+@dataclass(slots=True, frozen=True)
+class AccountRef:
+    id: int
+    name: str
+    type: AccountType
+    iban: str | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -47,6 +67,8 @@ class Transaction(BaseMatchItem):
     category: Category | None
     currency: Currency
     fx: FXContext | None = None
+    source_account: AccountRef | None = None
+    destination_account: AccountRef | None = None
 
     def has_tag(self, tag: TxTag) -> bool:
         return tag in self.tags

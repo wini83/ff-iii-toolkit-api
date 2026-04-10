@@ -116,7 +116,7 @@ class UserSecretsService:
                 external_username=external_username,
             )
 
-        if secret is not ...:
+        if isinstance(secret, str):
             user_key = self.vault_service.require_user_key(user_id, vault_session_id)
             encrypted = self.crypto_service.encrypt_secret(secret, user_key)
             self.secret_repo.update_encrypted_secret(
@@ -133,7 +133,7 @@ class UserSecretsService:
                 "external_username": (
                     None if external_username is ... else external_username
                 ),
-                "secret_rotated": secret is not ...,
+                "secret_rotated": isinstance(secret, str),
             },
         )
         return map_secret_to_domain_read_model(obj=secret_obj)

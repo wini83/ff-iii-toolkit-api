@@ -182,6 +182,7 @@ uv run ruff format .
 
 # type checking
 uv run env PYTHONPATH=src mypy .
+uv run ty check src
 
 # pre-commit (if installed)
 uv run pre-commit run --all-files
@@ -194,11 +195,13 @@ make test
 make cov
 make ruff
 make mypy
+make ty
 make pre
 ```
 
 ## CI/CD
 - `lint.yml`: runs Ruff on push (`main`, `dev`) and on pull requests.
+- `ty.yml`: runs Astral ty on push (`main`, `dev`) and on pull requests.
 - `pytest_coverage.yml`: runs tests with coverage on push to `main` and on pull requests; uploads to Codecov.
 - `codeql.yml`: CodeQL analysis on push/PR to `main` and weekly schedule.
 - `build.yml`: builds and pushes Docker image to GHCR on tag pushes matching `v*`.

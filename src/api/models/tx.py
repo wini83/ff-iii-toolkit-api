@@ -10,6 +10,25 @@ class SimplifiedItem(BaseModel):
     amount: float
 
 
+class AccountType(StrEnum):
+    ASSET = "asset"
+    EXPENSE = "expense"
+    REVENUE = "revenue"
+    LIABILITY = "liability"
+    LOAN = "loan"
+    DEBT = "debt"
+    MORTGAGE = "mortgage"
+    INITIAL_BALANCE = "initial-balance"
+    RECONCILIATION = "reconciliation"
+
+
+class SimplifiedAccountRef(BaseModel):
+    id: int
+    name: str
+    type: AccountType
+    iban: str | None = None
+
+
 class SimplifiedTx(SimplifiedItem):
     """Simplified representation of a Firefly III transaction."""
 
@@ -23,6 +42,8 @@ class SimplifiedTx(SimplifiedItem):
     type: Literal["withdrawal", "deposit", "transfer"]
     fx_amount: float | None = None
     fx_currency: str | None = None
+    source_account: SimplifiedAccountRef | None = None
+    destination_account: SimplifiedAccountRef | None = None
 
 
 class SimplifiedCategory(BaseModel):
