@@ -19,3 +19,6 @@ ruff:
 
 mypy:
 	uv run env PYTHONPATH=src mypy .
+
+ty:
+	uv run ty check src
