@@ -1,3 +1,26 @@
+## v2.13.0 (2026-04-11)
+
+### Feat
+
+- add firefly account refs and ty checking
+- add firefly account refs and ty checking
+- **bank-record**: print currencies together with amounts
+- **system**: add internal transaction snapshot refresh endpoint
+- **vault**: introduce encrypted user secrets with vault session flow
+- **citi**: add cached import preview and csv export endpoints (#44)
+
+### Fix
+
+- handle null secret update payload
+- narrow secret sentinel type
+- **mypy**: cast pandas groupby month counts to dict[str, int]
+
+### Refactor
+
+- **citi-import**: shorten export filenames and include transaction date range
+- **system**: make transaction snapshot TTL configurable and expose /api/system/transaction-snapshot
+- unify Firefly metrics around shared transaction snapshots (#40)
+
 ## v2.12.0 (2026-04-03)
 
 ### Feat
