@@ -46,6 +46,7 @@ dev = [
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
     "ruff>=0.14.5",
+    "ty>=0.0.29",
     "types-requests>=2.32.4.20260107",
 ]
 
@@ -56,6 +57,9 @@ package_module_name_map = { "pyjwt" = "jwt","python-dotenv" = "dotenv" }
 DEP001 = ["api", "middleware", "services", "settings", "utils"]
 DEP002 = ["httpx", "pandas-stubs", "python-multipart", "uvicorn"]
 DEP003 = ["anyio"]
+
+[tool.ty.environment]
+python-version = "3.12"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Any
+from typing import Any, no_type_check
 
 from dotenv import load_dotenv
 from pydantic import field_validator
@@ -75,4 +75,11 @@ class Settings(BaseSettings):
 
 
 # pyright: reportCallIssue=false
-settings = Settings()  # type: ignore[call-arg]
+
+
+@no_type_check
+def _build_settings() -> Settings:
+    return Settings()
+
+
+settings = _build_settings()

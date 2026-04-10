@@ -1,27 +1,47 @@
 from dataclasses import dataclass
 from decimal import Decimal
-from enum import Enum
+from enum import StrEnum
 
 from services.domain.base import BaseMatchItem
 
 
-class TxTag(str, Enum):
+class TxTag(StrEnum):
     blik_done = "blik_done"
     allegro_done = "allegro_done"
     rule_p = "rule_potential"
     action_req = "action_req"
 
 
-class TxType(str, Enum):
+class TxType(StrEnum):
     WITHDRAWAL = "withdrawal"
     DEPOSIT = "deposit"
     TRANSFER = "transfer"
+
+
+class AccountType(StrEnum):
+    ASSET = "asset"
+    EXPENSE = "expense"
+    REVENUE = "revenue"
+    LIABILITY = "liability"
+    LOAN = "loan"
+    DEBT = "debt"
+    MORTGAGE = "mortgage"
+    INITIAL_BALANCE = "initial-balance"
+    RECONCILIATION = "reconciliation"
 
 
 @dataclass
 class Category:
     id: int
     name: str
+
+
+@dataclass(slots=True, frozen=True)
+class AccountRef:
+    id: int
+    name: str
+    type: AccountType
+    iban: str | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -47,6 +67,8 @@ class Transaction(BaseMatchItem):
     category: Category | None
     currency: Currency
     fx: FXContext | None = None
+    source_account: AccountRef | None = None
+    destination_account: AccountRef | None = None
 
     def has_tag(self, tag: TxTag) -> bool:
         return tag in self.tags

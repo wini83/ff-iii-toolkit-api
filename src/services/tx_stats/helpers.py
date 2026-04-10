@@ -27,7 +27,7 @@ def _group_tx_by_month_sync(txs: list[Transaction]) -> dict[str, int]:
     dt = cast(Any, df["date"].dt)
     df["month"] = dt.to_period("M").astype(str)
 
-    return df.groupby("month").size().sort_index().to_dict()
+    return cast(dict[str, int], df.groupby("month").size().sort_index().to_dict())
 
 
 async def group_tx_by_month(

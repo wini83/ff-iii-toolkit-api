@@ -1,10 +1,16 @@
 from decimal import Decimal
 
-from api.models.tx import MatchProcessingStatus, SimplifiedCategory, SimplifiedTx
+from api.models.tx import (
+    AccountType,
+    MatchProcessingStatus,
+    SimplifiedAccountRef,
+    SimplifiedCategory,
+    SimplifiedTx,
+)
 from services.domain.match_result import (
     MatchProcessingStatus as DomainMatchProcessingStatus,
 )
-from services.domain.transaction import Category, Transaction
+from services.domain.transaction import AccountRef, Category, Transaction
 
 
 def to_api_amount(amount: Decimal, decimals: int) -> float:
@@ -43,11 +49,26 @@ def map_tx_to_api(tx: Transaction) -> SimplifiedTx:
         currency_code=tx.currency.code,
         fx_amount=fx_amount,
         fx_currency=fx_currency,
+        source_account=_map_account_ref_to_api(tx.source_account),
+        destination_account=_map_account_ref_to_api(tx.destination_account),
     )
 
 
 def map_category_to_api(cat: Category) -> SimplifiedCategory:
     return SimplifiedCategory(id=cat.id, name=cat.name)
+
+
+def _map_account_ref_to_api(
+    account: AccountRef | None,
+) -> SimplifiedAccountRef | None:
+    if account is None:
+        return None
+    return SimplifiedAccountRef(
+        id=account.id,
+        name=account.name,
+        type=AccountType(account.type.value),
+        iban=account.iban,
+    )
 
 
 DOMAIN_TO_API_STATUS = {

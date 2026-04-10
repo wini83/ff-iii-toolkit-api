@@ -7,7 +7,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from ff_iii_luciferin.api import FireflyAPIError
 
-from services.domain.transaction import Currency, Transaction, TransactionUpdate, TxType
+from services.domain.transaction import (
+    AccountRef,
+    AccountType,
+    Currency,
+    Transaction,
+    TransactionUpdate,
+    TxType,
+)
 from services.firefly_base_service import (
     FireflyBaseService,
     FireflyServiceError,
@@ -33,6 +40,13 @@ def test_fetch_transactions_excludes_categorized():
                 category=None,
                 currency=SimpleNamespace(code="PLN", symbol="zl", decimals=2),
                 fx=None,
+                source_account=SimpleNamespace(
+                    id=11,
+                    name="Main account",
+                    type=SimpleNamespace(value="asset"),
+                    iban="PL123",
+                ),
+                destination_account=None,
             ),
             SimpleNamespace(
                 id=2,
@@ -45,6 +59,8 @@ def test_fetch_transactions_excludes_categorized():
                 category=SimpleNamespace(id=1, name="Food"),
                 currency=SimpleNamespace(code="PLN", symbol="zl", decimals=2),
                 fx=None,
+                source_account=None,
+                destination_account=None,
             ),
         ]
     )
@@ -66,6 +82,13 @@ def test_fetch_transactions_excludes_categorized():
     )
     assert [t.id for t in result] == [1]
     assert all(isinstance(t, Transaction) for t in result)
+    assert result[0].source_account == AccountRef(
+        id=11,
+        name="Main account",
+        type=AccountType.ASSET,
+        iban="PL123",
+    )
+    assert result[0].destination_account is None
 
 
 def test_fetch_transactions_raises_firefly_service_error():

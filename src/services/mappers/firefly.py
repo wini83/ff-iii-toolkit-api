@@ -1,7 +1,15 @@
 from ff_iii_luciferin.api.transaction_update import TransactionUpdate as ff_tu
-from ff_iii_luciferin.domain.models import SimplifiedCategory, SimplifiedTx
+from ff_iii_luciferin.domain.models import (
+    SimplifiedAccountRef as ff_account_ref,
+)
+from ff_iii_luciferin.domain.models import (
+    SimplifiedCategory,
+    SimplifiedTx,
+)
 
 from services.domain.transaction import (
+    AccountRef,
+    AccountType,
     Category,
     Currency,
     FXContext,
@@ -22,6 +30,15 @@ def tx_from_ff_tx(tx: SimplifiedTx) -> Transaction:
             ),
             original_amount=tx.fx.original_amount,
         )
+
+    source_account = getattr(tx, "source_account", None)
+    if source_account is not None:
+        source_account = account_ref_from_ff_account_ref(source_account)
+
+    destination_account = getattr(tx, "destination_account", None)
+    if destination_account is not None:
+        destination_account = account_ref_from_ff_account_ref(destination_account)
+
     return Transaction(
         id=tx.id,
         date=tx.date,
@@ -39,11 +56,22 @@ def tx_from_ff_tx(tx: SimplifiedTx) -> Transaction:
             decimals=tx.currency.decimals,
         ),
         fx=fx,
+        source_account=source_account,
+        destination_account=destination_account,
     )
 
 
 def category_from_ff_category(cat: SimplifiedCategory) -> Category:
     return Category(id=cat.id, name=cat.name)
+
+
+def account_ref_from_ff_account_ref(account: ff_account_ref) -> AccountRef:
+    return AccountRef(
+        id=account.id,
+        name=account.name,
+        type=AccountType(account.type.value),
+        iban=account.iban,
+    )
 
 
 def tx_update_to_ff_tx_update(tu: TransactionUpdate) -> ff_tu:

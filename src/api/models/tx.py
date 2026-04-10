@@ -1,5 +1,5 @@
 from datetime import date
-from enum import Enum
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel
@@ -8,6 +8,25 @@ from pydantic import BaseModel
 class SimplifiedItem(BaseModel):
     date: date
     amount: float
+
+
+class AccountType(StrEnum):
+    ASSET = "asset"
+    EXPENSE = "expense"
+    REVENUE = "revenue"
+    LIABILITY = "liability"
+    LOAN = "loan"
+    DEBT = "debt"
+    MORTGAGE = "mortgage"
+    INITIAL_BALANCE = "initial-balance"
+    RECONCILIATION = "reconciliation"
+
+
+class SimplifiedAccountRef(BaseModel):
+    id: int
+    name: str
+    type: AccountType
+    iban: str | None = None
 
 
 class SimplifiedTx(SimplifiedItem):
@@ -23,6 +42,8 @@ class SimplifiedTx(SimplifiedItem):
     type: Literal["withdrawal", "deposit", "transfer"]
     fx_amount: float | None = None
     fx_currency: str | None = None
+    source_account: SimplifiedAccountRef | None = None
+    destination_account: SimplifiedAccountRef | None = None
 
 
 class SimplifiedCategory(BaseModel):
@@ -45,13 +66,13 @@ class ScreeningMonthResponse(BaseModel):
     categories: list[SimplifiedCategory]
 
 
-class TxTag(str, Enum):
+class TxTag(StrEnum):
     blik_done = "blik_done"
     allegro_done = "allegro_done"
     rule_p = "rule_potential"
     action_req = "action_req"
 
 
-class MatchProcessingStatus(str, Enum):
+class MatchProcessingStatus(StrEnum):
     NEW = "new"
     ALREADY_PROCESSED = "already_processed"

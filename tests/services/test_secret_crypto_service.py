@@ -40,7 +40,8 @@ def test_vault_check_verification_returns_false_for_tampered_blob():
     user_key = service.derive_user_key("passphrase").key
     blob = service.create_vault_check(user_key)
     tampered = VaultCheckBlob(
-        ciphertext=blob.ciphertext[:-1] + b"\x00", nonce=blob.nonce
+        ciphertext=blob.ciphertext[:-1] + bytes([blob.ciphertext[-1] ^ 0x01]),
+        nonce=blob.nonce,
     )
 
     assert service.verify_vault_check(user_key, tampered) is False

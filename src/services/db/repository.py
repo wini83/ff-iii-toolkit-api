@@ -248,9 +248,9 @@ class UserSecretRepository:
         external_username: str | None | object = ...,
     ) -> UserSecretORM:
         if alias is not ...:
-            secret.alias = alias
+            secret.alias = alias  # ty: ignore[invalid-assignment]
         if external_username is not ...:
-            secret.external_username = external_username
+            secret.external_username = external_username  # ty: ignore[invalid-assignment]
         self.db.flush()
         return secret
 
