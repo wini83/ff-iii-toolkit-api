@@ -1,4 +1,5 @@
 # services/user_secrets_service.py
+from types import EllipsisType
 from uuid import UUID
 
 from services.db.models import UserSecretORM
@@ -99,7 +100,7 @@ class UserSecretsService:
         vault_session_id: str | None = None,
         alias: str | None | object = ...,
         external_username: str | None | object = ...,
-        secret: str | object = ...,
+        secret: str | EllipsisType = ...,
     ) -> UserSecretReadModel:
         """Update metadata and optionally rotate encrypted secret material."""
         secret_obj = self.secret_repo.get_by_id(secret_id)
