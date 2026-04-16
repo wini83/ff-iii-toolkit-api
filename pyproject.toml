@@ -9,7 +9,7 @@ dependencies = [
  "pydantic>=2",
  "pydantic-settings>=2.12.0",
  "pyjwt>=2.10.1",
- "python-multipart>=0.0.20",
+ "python-multipart>=0.0.26",
  "starlette>=0.37.2",
  "uvicorn>=0.38.0",
  "python-dotenv>=1.0.0",
@@ -39,14 +39,14 @@ ignore_missing_version = true
 
 [dependency-groups]
 dev = [
-    "commitizen>=4.10.0",
+    "commitizen>=4.13.10",
     "deptry>=0.24.0",
     "mypy>=1.18.2",
     "pre-commit>=4.5.1",
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
     "ruff>=0.14.5",
-    "ty>=0.0.29",
+    "ty>=0.0.31",
     "types-requests>=2.32.4.20260107",
 ]
 
