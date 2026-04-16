@@ -36,8 +36,8 @@ def test_get_orders_calls_api_wrapper_and_parser(monkeypatch):
     wrapper_get = MagicMock(return_value={"ok": True})
     monkeypatch.setattr(client, "_api_wrapper", MagicMock(get=wrapper_get))
     monkeypatch.setattr(
-        allegro_api_module,
-        "GetOrdersResult",
+        allegro_api_module.GetOrdersResult,
+        "from_dict",
         lambda payload: ("parsed-orders", payload),
     )
 

@@ -1,12 +1,23 @@
 """Data structures for the ``get_orders`` API call."""
 
+from __future__ import annotations
+
 import hashlib
+import logging
 import re
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, Self
+
+from services.allegro.payloads import (
+    GetOrdersResponse,
+    OfferPayload,
+    OrderPayload,
+)
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def short_id(id_str: str, length: int = 8) -> str:
@@ -15,63 +26,30 @@ def short_id(id_str: str, length: int = 8) -> str:
 
 
 class GetOrdersResult:  # pylint: disable=too-few-public-methods
-    """Result of get_orders method"""
+    """Result of get_orders method."""
 
-    def __init__(self, items: dict[str, Any]) -> None:
-        """Init method"""
+    def __init__(self, items: GetOrdersResponse) -> None:
+        """Init method."""
+        self._payload = items
         self.orders: list[Order] = []
-        for group in items["orderGroups"]:
-            self.orders.append(Order(group["groupId"], group["myorders"][0]))
+        for group in self._payload.order_groups:
+            for order_payload in group.orders:
+                self.orders.append(Order.from_payload(group.group_id, order_payload))
         self.payments: list[Payment] = Payment.from_orders(self.orders)
 
-    def as_list(self) -> list["Order"]:
+    @classmethod
+    def from_dict(cls, items: dict[str, Any]) -> Self:
+        """Create result from a raw API payload."""
+        return cls(GetOrdersResponse.model_validate(items))
+
+    def as_list(self) -> list[Order]:
         """Return orders as list."""
         return self.orders
 
 
-class Order:
-    """Single order item"""
-
-    def __init__(self, order_id: str, items: dict[str, Any]) -> None:
-        """Initialize order from API response ``items``."""
-        self.order_id = order_id
-        self.seller = items["seller"]["login"]
-        self.offers = [Offer.from_dict(o) for o in items["offers"]]
-        self._order_date = items["orderDate"]
-        self.total_cost_amount: Decimal = Decimal(items["totalCost"]["amount"])
-        self.payment_amount = Decimal(items["payment"]["amount"]["amount"])
-        self.currency_code = items["payment"]["amount"]["currency"]
-        self.payment_provider: str = items["payment"]["provider"]
-        self.payment_method: str = items["payment"]["method"]
-        self.payment_id: str = items["payment"]["id"]
-
-    def print_offers(self) -> str:
-        """Return human readable representation of ordered offers."""
-        return "\n".join(
-            f"{offer.get_simplified_title()} ({offer.unit_price} "
-            f"{offer.price_currency})"
-            for offer in self.offers
-        )
-
-    def list_offers(self) -> list[str]:
-        """Return list of human readable representations of ordered offers."""
-        return [
-            f"{offer.get_simplified_title()} ({offer.unit_price} "
-            f"{offer.price_currency})"
-            for offer in self.offers
-        ]
-
-    @property
-    def order_date(self) -> datetime:
-        """Return order date as ``datetime`` with timezone awareness."""
-        if self._order_date.endswith("Z"):
-            return datetime.fromisoformat(self._order_date[:-1]).replace(tzinfo=UTC)
-        return datetime.fromisoformat(self._order_date)
-
-
 @dataclass(slots=True)
 class Offer:
-    """Single offer item"""
+    """Single offer item."""
 
     offer_id: str
     title: str
@@ -81,17 +59,17 @@ class Offer:
     quantity: int
     image_url: str
 
-    @staticmethod
-    def from_dict(item: dict[str, Any]) -> "Offer":
-        """Create :class:`Offer` from API response ``item``."""
-        return Offer(
-            item["id"],
-            item["title"],
-            Decimal(item["unitPrice"]["amount"]),
-            item["unitPrice"]["currency"],
-            item["friendlyUrl"],
-            int(item["quantity"]),
-            item["imageUrl"],
+    @classmethod
+    def from_payload(cls, payload: OfferPayload) -> Offer:
+        """Create :class:`Offer` from parsed API payload."""
+        return cls(
+            offer_id=payload.offer_id,
+            title=payload.title,
+            unit_price=payload.unit_price.amount,
+            price_currency=payload.unit_price.currency,
+            friendly_url=payload.friendly_url,
+            quantity=payload.quantity,
+            image_url=payload.image_url,
         )
 
     def get_simplified_title(self) -> str:
@@ -122,13 +100,100 @@ class Offer:
         return " ".join(result)
 
 
-@dataclass()
+@dataclass(slots=True)
+class Order:
+    """Single order item."""
+
+    group_id: str
+    seller: str
+    offers: list[Offer]
+    _order_date: datetime
+    total_cost_amount: Decimal
+    payment_amount: Decimal
+    currency_code: str
+    payment_provider: str
+    payment_method: str
+    payment_id: str
+
+    @classmethod
+    def from_payload(cls, group_id: str, payload: OrderPayload) -> Order:
+        """Create :class:`Order` from parsed API payload."""
+        return cls(
+            group_id=group_id,
+            seller=payload.seller.login,
+            offers=[Offer.from_payload(offer) for offer in payload.offers],
+            _order_date=payload.order_date,
+            total_cost_amount=payload.total_cost.amount,
+            payment_amount=payload.payment.amount.amount,
+            currency_code=payload.payment.amount.currency,
+            payment_provider=payload.payment.provider,
+            payment_method=payload.payment.method,
+            payment_id=payload.payment.payment_id,
+        )
+
+    @property
+    def order_id(self) -> str:
+        """Return the legacy order identifier alias."""
+        return self.group_id
+
+    def format_offers(self) -> str:
+        """Return human readable representation of ordered offers."""
+        return "\n".join(
+            f"{offer.get_simplified_title()} ({offer.unit_price} "
+            f"{offer.price_currency})"
+            for offer in self.offers
+        )
+
+    def list_offers(self) -> list[str]:
+        """Return list of human readable representations of ordered offers."""
+        return [
+            f"{offer.get_simplified_title()} ({offer.unit_price} "
+            f"{offer.price_currency})"
+            for offer in self.offers
+        ]
+
+    @property
+    def order_date(self) -> datetime:
+        """Return order date as ``datetime`` with timezone awareness."""
+        if self._order_date.tzinfo is None:
+            return self._order_date.replace(tzinfo=UTC)
+        return self._order_date
+
+
+@dataclass(slots=True)
 class Payment:
     """Group of orders paid together."""
 
     payment_id: str
-    orders: list["Order"]
+    orders: list[Order]
     tolerance: Decimal = Decimal("0.01")
+
+    def __post_init__(self) -> None:
+        """Warn when payment metadata differs across grouped orders."""
+        if not self.orders:
+            return
+
+        first_currency = self.orders[0].currency_code
+        first_provider = self.orders[0].payment_provider
+        first_method = self.orders[0].payment_method
+        first_amount = self.orders[0].payment_amount
+
+        mismatches: list[str] = []
+        if any(order.currency_code != first_currency for order in self.orders[1:]):
+            mismatches.append("currency")
+        if any(order.payment_provider != first_provider for order in self.orders[1:]):
+            mismatches.append("provider")
+        if any(order.payment_method != first_method for order in self.orders[1:]):
+            mismatches.append("method")
+        if any(order.payment_amount != first_amount for order in self.orders[1:]):
+            mismatches.append("amount")
+
+        if mismatches:
+            _LOGGER.warning(
+                "Inconsistent payment metadata for %s; mismatched fields: %s",
+                self.payment_id,
+                ", ".join(mismatches),
+            )
 
     @property
     def short_id(self) -> str:
@@ -186,7 +251,7 @@ class Payment:
 
     @property
     def is_balanced(self) -> bool:
-        """Czy suma wartości zamówień zgadza się z kwotą płatności (z tolerancją)."""
+        """Whether the order total matches the payment amount within tolerance."""
         return abs(self.amount - self.sum_total_cost) <= self.tolerance
 
     def __str__(self) -> str:
@@ -204,12 +269,14 @@ class Payment:
         )
 
     @classmethod
-    def from_orders(cls, orders: list["Order"]) -> list[Self]:
-        """Grupuje zamówienia po `payment_id` i tworzy obiekty Payment."""
-        grouped = defaultdict(list)
+    def from_orders(cls, orders: list[Order]) -> list[Self]:
+        """Group orders by ``payment_id`` and create ``Payment`` objects."""
+        grouped: dict[str, list[Order]] = defaultdict(list)
 
         for order in orders:
             grouped[order.payment_id].append(order)
 
-        payments = [cls(payment_id=pid, orders=group) for pid, group in grouped.items()]
-        return payments
+        return [
+            cls(payment_id=payment_id, orders=group)
+            for payment_id, group in grouped.items()
+        ]

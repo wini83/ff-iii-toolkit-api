@@ -10,6 +10,7 @@ from services.allegro.get_order_result import (
     Payment,
     short_id,
 )
+from services.allegro.payloads import GetOrdersResponse, OrderPayload
 
 
 def _order_item(*, payment_id: str = "pay-123") -> dict:
@@ -37,7 +38,7 @@ def _order_item(*, payment_id: str = "pay-123") -> dict:
 
 
 def test_order_and_payment_metadata_happy_path():
-    order = Order("order-1", _order_item())
+    order = Order.from_payload("order-1", OrderPayload.model_validate(_order_item()))
     payment = Payment(payment_id=order.payment_id, orders=[order])
 
     assert order.currency_code == "PLN"
@@ -54,23 +55,49 @@ def test_order_and_payment_metadata_happy_path():
 def test_get_orders_result_builds_orders_and_groups_payments():
     payload = {
         "orderGroups": [
-            {"groupId": "g1", "myorders": [_order_item(payment_id="same-pay")]},
-            {"groupId": "g2", "myorders": [_order_item(payment_id="same-pay")]},
+            {
+                "groupId": "g1",
+                "myorders": [
+                    _order_item(payment_id="same-pay"),
+                    _order_item(payment_id="same-pay"),
+                ],
+            }
         ]
     }
 
-    result = GetOrdersResult(payload)
+    result = GetOrdersResult.from_dict(payload)
 
     assert len(result.as_list()) == 2
     assert len(result.payments) == 1
+    assert all(order.group_id == "g1" for order in result.as_list())
+
+
+def test_get_orders_response_parses_nested_monetary_and_datetime_values():
+    response = GetOrdersResponse.model_validate(
+        {
+            "orderGroups": [
+                {
+                    "groupId": "g1",
+                    "myorders": [_order_item(payment_id="same-pay")],
+                }
+            ]
+        }
+    )
+
+    order = response.order_groups[0].orders[0]
+
+    assert isinstance(order.order_date, datetime)
+    assert order.payment.amount.amount == Decimal("12.34")
+    assert order.payment.amount.currency == "PLN"
+    assert order.total_cost.amount == Decimal("12.34")
 
 
 def test_order_rendering_and_date_parsing_with_z_suffix():
-    order = Order("order-1", _order_item())
+    order = Order.from_payload("order-1", OrderPayload.model_validate(_order_item()))
 
     assert order.order_date.tzinfo is not None
     assert len(order.list_offers()) == 1
-    assert "Sample Product" in order.print_offers()
+    assert "Sample Product" in order.format_offers()
 
 
 def test_payment_metadata_properties_raise_for_empty_orders():
@@ -103,8 +130,12 @@ def test_offer_get_simplified_title_edge_case_with_empty_title():
 
 
 def test_payment_list_details_sum_and_repr():
-    first = Order("order-1", _order_item(payment_id="pay-99"))
-    second = Order("order-2", _order_item(payment_id="pay-99"))
+    first = Order.from_payload(
+        "order-1", OrderPayload.model_validate(_order_item(payment_id="pay-99"))
+    )
+    second = Order.from_payload(
+        "order-2", OrderPayload.model_validate(_order_item(payment_id="pay-99"))
+    )
     payment = Payment.from_orders([first, second])[0]
 
     details = payment.list_details()
