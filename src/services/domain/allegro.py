@@ -32,7 +32,6 @@ class AllegroOrderPayment(OrderPayment):
         # allegro_login is used ONLY for details / UI
         details = list[str]()
         details.append(f"Buyer: {allegro_login}")
-        details.append(f"Payment ID: {payment.short_id}")
         details.extend(payment.list_details())
         details.append(
             f"Payment metadata: {payment.payment_method}/{payment.payment_provider}"

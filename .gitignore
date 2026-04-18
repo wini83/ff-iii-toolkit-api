@@ -144,3 +144,4 @@ data/app.db
 
 sandbox/*
 .codex
+var/debug/allegro/orders_snapshot.json
