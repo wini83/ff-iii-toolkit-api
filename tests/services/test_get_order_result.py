@@ -1,8 +1,12 @@
 from datetime import UTC, datetime
 from decimal import Decimal
+from types import SimpleNamespace
+from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
+import services.allegro.get_order_result as get_order_result_module
 from services.allegro.get_order_result import (
     GetOrdersResult,
     Offer,
@@ -12,6 +16,8 @@ from services.allegro.get_order_result import (
 )
 from services.allegro.payloads import GetOrdersResponse, OrderPayload
 
+_DEFAULT_DELIVERY = object()
+
 
 def _order_item(
     *,
@@ -20,47 +26,64 @@ def _order_item(
     purchase_id: str = "purchase-123",
     payment_id: str = "pay-123",
     quantity: int = 1,
+    title: str = "Sample Product",
+    create_date: datetime | None = datetime(2024, 1, 1, tzinfo=UTC),
+    order_date: datetime = datetime(2024, 1, 1, tzinfo=UTC),
+    payment_date: datetime | None = datetime(2024, 1, 1, tzinfo=UTC),
+    delivery: Any = _DEFAULT_DELIVERY,
+    total_cost_amount: str = "22.83",
+    payment_amount: str = "22.83",
+    payment_currency: str = "PLN",
+    payment_provider: str = "PAYU",
+    payment_method: str = "BLIK",
     delivery_cost: str = "10.49",
-) -> dict:
-    return {
+) -> dict[str, Any]:
+    item: dict[str, Any] = {
         "id": order_id,
         "purchaseId": purchase_id,
         "seller": {"login": "seller"},
         "offers": [
             {
                 "id": "offer-1",
-                "title": "Sample Product",
+                "title": title,
                 "unitPrice": {"amount": "12.34", "currency": "PLN"},
                 "friendlyUrl": "https://example.com",
                 "quantity": quantity,
                 "imageUrl": "https://example.com/image.jpg",
             }
         ],
-        "delivery": {
-            "cost": {"amount": delivery_cost, "currency": "PLN"},
-            "name": "Allegro One Box, DPD",
-            "deliveredBy": "Delivery by Allegro One",
-            "methodId": "0b257488-c85d-4507-b967-9b45ffbfa2e8",
-            "status": "DELIVERED",
-        },
-        "createDate": datetime(2024, 1, 1, tzinfo=UTC).isoformat(),
-        "orderDate": datetime(2024, 1, 1, tzinfo=UTC).isoformat(),
+        "orderDate": order_date.isoformat(),
         "status": {
             "primary": {"status": "DELIVERED", "action": "RATE_SELLER"},
             "traits": ["IS_SURCHARGE_ALLOWED"],
             "actions": [{"type": "RATE_SELLER", "enabled": True}],
         },
-        "totalCost": {"amount": "22.83"},
+        "totalCost": {"amount": total_cost_amount},
         "payment": {
             "id": payment_id,
-            "provider": "PAYU",
-            "amount": {"amount": "22.83", "currency": "PLN"},
-            "method": "BLIK",
+            "provider": payment_provider,
+            "amount": {"amount": payment_amount, "currency": payment_currency},
+            "method": payment_method,
             "methodId": "OCP-ap",
             "status": "COMPLETED",
-            "date": datetime(2024, 1, 1, tzinfo=UTC).isoformat(),
+            "date": payment_date.isoformat() if payment_date is not None else None,
         },
     }
+
+    if create_date is not None:
+        item["createDate"] = create_date.isoformat()
+    if delivery is _DEFAULT_DELIVERY:
+        item["delivery"] = {
+            "cost": {"amount": delivery_cost, "currency": "PLN"},
+            "name": "Allegro One Box, DPD",
+            "deliveredBy": "Delivery by Allegro One",
+            "methodId": "0b257488-c85d-4507-b967-9b45ffbfa2e8",
+            "status": "DELIVERED",
+        }
+    else:
+        item["delivery"] = delivery
+
+    return item
 
 
 def test_order_and_payment_metadata_happy_path():
@@ -211,3 +234,157 @@ def test_payment_list_details_sum_and_repr():
     assert details[2] == "Sample Product x1 (12.34 PLN)"
     assert details[3] == "Delivery: Allegro One Box, DPD (10.49 PLN)"
     assert "Payment " in repr(payment)
+
+
+def test_order_and_payment_date_aliases_and_naive_datetime_handling():
+    order = Order.from_payload(
+        "group-1",
+        OrderPayload.model_validate(
+            _order_item(
+                create_date=datetime(2024, 1, 1, 11, 0),
+                order_date=datetime(2024, 1, 1, 12, 0),
+                payment_date=datetime(2024, 1, 1, 13, 0),
+                delivery={
+                    "name": "Free delivery",
+                    "deliveredBy": "Carrier",
+                    "methodId": "delivery-1",
+                    "status": "DELIVERED",
+                },
+            )
+        ),
+    )
+
+    assert order.order_date.tzinfo == UTC
+    assert order.create_date.tzinfo == UTC
+    assert order.create_date.hour == 11
+    assert order.payment_date is not None
+    assert order.payment_date.tzinfo == UTC
+    assert order.delivery_total == Decimal("0")
+    assert order.delivery is not None
+    assert order.delivery.cost_amount == Decimal("0")
+    assert order.print_offers() == order.format_offers()
+    assert order.is_balanced == order.is_known_total_balanced
+
+
+def test_order_create_date_and_payment_date_optional_branches():
+    order = Order.from_payload(
+        "group-1",
+        OrderPayload.model_validate(
+            _order_item(
+                create_date=None,
+                payment_date=None,
+                delivery=None,
+            )
+        ),
+    )
+
+    assert order.create_date.tzinfo == UTC
+    assert order.create_date == order.order_date
+    assert order.payment_date is None
+    assert order.delivery_total == Decimal("0")
+
+
+def test_payment_details_skip_missing_or_free_delivery_and_warn_on_mismatch(
+    monkeypatch,
+):
+    first = Order.from_payload(
+        "group-1",
+        OrderPayload.model_validate(_order_item(payment_id="pay-77")),
+    )
+    second = Order.from_payload(
+        "group-1",
+        OrderPayload.model_validate(
+            _order_item(
+                order_id="order-2",
+                payment_id="pay-77",
+                payment_provider="CARD",
+                payment_method="CARD",
+                payment_currency="EUR",
+                payment_amount="99.99",
+                total_cost_amount="99.99",
+                delivery={
+                    "cost": {"amount": "0.00", "currency": "PLN"},
+                    "name": "Free delivery",
+                    "deliveredBy": "Carrier",
+                    "methodId": "delivery-2",
+                    "status": "DELIVERED",
+                },
+            )
+        ),
+    )
+
+    warning = MagicMock()
+    monkeypatch.setattr(get_order_result_module._LOGGER, "warning", warning)
+    payment = Payment.from_orders([first, second])[0]
+
+    assert payment.amount == Decimal("22.83")
+    assert payment.date == first.payment_date
+    assert payment.is_balanced is False
+    assert payment.list_details() == [
+        "Sample Product x1 (12.34 PLN)",
+        "Delivery: Allegro One Box, DPD (10.49 PLN)",
+        "Sample Product x1 (12.34 PLN)",
+    ]
+    assert payment.sum_total_cost == payment.known_total
+    warning.assert_called_once_with(
+        "Inconsistent payment metadata for %s; mismatched fields: %s",
+        "pay-77",
+        "currency, provider, method, amount",
+    )
+
+
+def test_payment_list_details_skips_missing_delivery_and_missing_cost():
+    missing_delivery = Order.from_payload(
+        "group-1",
+        OrderPayload.model_validate(
+            _order_item(order_id="order-3", payment_id="pay-88", delivery=None)
+        ),
+    )
+    missing_cost = Order.from_payload(
+        "group-1",
+        OrderPayload.model_validate(
+            _order_item(
+                order_id="order-4",
+                payment_id="pay-88",
+                delivery={
+                    "name": "Mystery delivery",
+                    "deliveredBy": "Carrier",
+                    "methodId": "delivery-4",
+                    "status": "DELIVERED",
+                },
+            )
+        ),
+    )
+    missing_cost.delivery = SimpleNamespace(
+        cost_amount=Decimal("1.00"),
+        cost=None,
+        name="Mystery delivery",
+    )
+
+    payment = Payment.from_orders([missing_delivery, missing_cost])[0]
+
+    assert payment.list_details() == [
+        "Sample Product x1 (12.34 PLN)",
+        "Sample Product x1 (12.34 PLN)",
+    ]
+
+
+def test_payment_date_raises_without_orders():
+    payment = Payment(payment_id="pay-1", orders=[])
+
+    with pytest.raises(ValueError, match="No orders in payment"):
+        _ = payment.date
+
+
+def test_offer_simplified_title_truncates_and_normalizes():
+    offer = Offer(
+        offer_id="o2",
+        title="super-fast usb-c cable with extra-long name",
+        unit_price=Decimal("1.00"),
+        price_currency="PLN",
+        friendly_url="u",
+        quantity=1,
+        image_url="i",
+    )
+
+    assert offer.get_simplified_title() == "Super-Fast Usb-c Cable"
