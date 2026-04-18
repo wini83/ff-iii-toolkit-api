@@ -196,7 +196,7 @@ class Order:
     def format_offers(self) -> str:
         """Return human readable representation of ordered offers."""
         return "\n".join(
-            f"{offer.get_simplified_title()} ({offer.unit_price} "
+            f"{offer.get_simplified_title()} x{offer.quantity} ({offer.unit_price} "
             f"{offer.price_currency})"
             for offer in self.offers
         )
@@ -204,7 +204,7 @@ class Order:
     def list_offers(self) -> list[str]:
         """Return list of human readable representations of ordered offers."""
         return [
-            f"{offer.get_simplified_title()} ({offer.unit_price} "
+            f"{offer.get_simplified_title()} x{offer.quantity} ({offer.unit_price} "
             f"{offer.price_currency})"
             for offer in self.offers
         ]
@@ -300,6 +300,17 @@ class Payment:
         details = list[str]()
         for order in self.orders:
             details.extend(order.list_offers())
+            if order.delivery is None:
+                continue
+            if order.delivery.cost_amount == Decimal("0"):
+                continue
+            delivery_cost = order.delivery.cost
+            if delivery_cost is None:
+                continue
+            delivery_name = order.delivery.name or "Delivery"
+            details.append(
+                f"{delivery_name} ({delivery_cost.amount} {delivery_cost.currency})"
+            )
         return details
 
     @property

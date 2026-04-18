@@ -88,6 +88,7 @@ def test_order_and_payment_metadata_happy_path():
     assert payment.known_total == Decimal("22.83")
     assert payment.balance_difference == Decimal("0.00")
     assert payment.is_known_total_balanced is True
+    assert order.list_offers() == ["Sample Product x1 (12.34 PLN)"]
     assert "Payment metadata: PAYU/BLIK" in str(payment)
 
 
@@ -151,7 +152,8 @@ def test_order_rendering_and_date_parsing_with_z_suffix():
     assert order.create_date.tzinfo is not None
     assert order.payment_date is not None
     assert len(order.list_offers()) == 1
-    assert "Sample Product" in order.format_offers()
+    assert order.list_offers()[0] == "Sample Product x1 (12.34 PLN)"
+    assert "Sample Product x1" in order.format_offers()
 
 
 def test_payment_metadata_properties_raise_for_empty_orders():
@@ -200,6 +202,10 @@ def test_payment_list_details_sum_and_repr():
 
     details = payment.list_details()
 
-    assert len(details) == 2
+    assert len(details) == 4
     assert payment.sum_total_cost == Decimal("45.66")
+    assert details[0] == "Sample Product x1 (12.34 PLN)"
+    assert details[1] == "Allegro One Box, DPD (10.49 PLN)"
+    assert details[2] == "Sample Product x1 (12.34 PLN)"
+    assert details[3] == "Allegro One Box, DPD (10.49 PLN)"
     assert "Payment " in repr(payment)

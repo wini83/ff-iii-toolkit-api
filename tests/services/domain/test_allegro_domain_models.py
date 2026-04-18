@@ -17,7 +17,11 @@ class DummyPayment:
     is_balanced = True
 
     def list_details(self):
-        return ["Order: #123", "Type: full"]
+        return [
+            "Order: #123 x2 (12.34 PLN)",
+            "Delivery: Allegro One Box (10.49 PLN)",
+            "Type: full",
+        ]
 
 
 def test_from_allegro_payment_builds_details_and_metadata():
@@ -31,6 +35,8 @@ def test_from_allegro_payment_builds_details_and_metadata():
     assert result.external_id == "PAYMENT-1"
     assert result.details[0] == "Buyer: buyer_login"
     assert result.details[1] == "Payment ID: SHORT-1"
+    assert result.details[2] == "Order: #123 x2 (12.34 PLN)"
+    assert result.details[3] == "Delivery: Allegro One Box (10.49 PLN)"
     assert result.details[-1] == "Payment metadata: CARD/VISA"
 
 
