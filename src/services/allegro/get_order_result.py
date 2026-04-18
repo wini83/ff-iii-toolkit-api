@@ -309,7 +309,8 @@ class Payment:
                 continue
             delivery_name = order.delivery.name or "Delivery"
             details.append(
-                f"{delivery_name} ({delivery_cost.amount} {delivery_cost.currency})"
+                f"Delivery: {delivery_name} ({delivery_cost.amount} "
+                f"{delivery_cost.currency})"
             )
         return details
 

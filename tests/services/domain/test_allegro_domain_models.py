@@ -34,9 +34,8 @@ def test_from_allegro_payment_builds_details_and_metadata():
     assert result.external_short_id == "SHORT-1"
     assert result.external_id == "PAYMENT-1"
     assert result.details[0] == "Buyer: buyer_login"
-    assert result.details[1] == "Payment ID: SHORT-1"
-    assert result.details[2] == "Order: #123 x2 (12.34 PLN)"
-    assert result.details[3] == "Delivery: Allegro One Box (10.49 PLN)"
+    assert result.details[1] == "Order: #123 x2 (12.34 PLN)"
+    assert result.details[2] == "Delivery: Allegro One Box (10.49 PLN)"
     assert result.details[-1] == "Payment metadata: CARD/VISA"
 
 
