@@ -46,7 +46,7 @@ class AllegroApiClient:
             f"{ALLEGRO_API_URL}/myorder-api/myorders?limit={limit}&offset={offset}",
             headers=headers,
         )
-        return GetOrdersResult(get_orders_response)
+        return GetOrdersResult.from_dict(get_orders_response)
 
     def get_user_info(self) -> GetUserInfoResult:
         """Get info about current user."""
