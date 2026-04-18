@@ -12,7 +12,9 @@ from decimal import Decimal
 from typing import Any, Self
 
 from services.allegro.payloads import (
+    DeliveryPayload,
     GetOrdersResponse,
+    MoneyPayload,
     OfferPayload,
     OrderPayload,
 )
@@ -104,10 +106,15 @@ class Offer:
 class Order:
     """Single order item."""
 
+    order_id: str
     group_id: str
+    purchase_id: str | None
     seller: str
     offers: list[Offer]
+    delivery: Delivery | None
     _order_date: datetime
+    _create_date: datetime | None
+    _payment_date: datetime | None
     total_cost_amount: Decimal
     payment_amount: Decimal
     currency_code: str
@@ -119,10 +126,17 @@ class Order:
     def from_payload(cls, group_id: str, payload: OrderPayload) -> Order:
         """Create :class:`Order` from parsed API payload."""
         return cls(
+            order_id=payload.order_id,
             group_id=group_id,
+            purchase_id=payload.purchase_id,
             seller=payload.seller.login,
             offers=[Offer.from_payload(offer) for offer in payload.offers],
+            delivery=Delivery.from_payload(payload.delivery)
+            if payload.delivery
+            else None,
             _order_date=payload.order_date,
+            _create_date=payload.create_date,
+            _payment_date=payload.payment.date,
             total_cost_amount=payload.total_cost.amount,
             payment_amount=payload.payment.amount.amount,
             currency_code=payload.payment.amount.currency,
@@ -132,9 +146,52 @@ class Order:
         )
 
     @property
-    def order_id(self) -> str:
-        """Return the legacy order identifier alias."""
-        return self.group_id
+    def create_date(self) -> datetime:
+        """Return order creation date when available."""
+        if self._create_date is None:
+            return self.order_date
+        if self._create_date.tzinfo is None:
+            return self._create_date.replace(tzinfo=UTC)
+        return self._create_date
+
+    @property
+    def payment_date(self) -> datetime | None:
+        """Return payment date when available."""
+        if self._payment_date is None:
+            return None
+        if self._payment_date.tzinfo is None:
+            return self._payment_date.replace(tzinfo=UTC)
+        return self._payment_date
+
+    @property
+    def items_total(self) -> Decimal:
+        """Return the sum of item prices in the order."""
+        return sum(
+            (offer.unit_price * Decimal(offer.quantity) for offer in self.offers),
+            start=Decimal("0"),
+        )
+
+    @property
+    def delivery_total(self) -> Decimal:
+        """Return the delivery total for the order."""
+        if self.delivery is None:
+            return Decimal("0")
+        return self.delivery.cost_amount
+
+    @property
+    def known_total(self) -> Decimal:
+        """Return the total derived from modeled monetary components."""
+        return self.items_total + self.delivery_total
+
+    @property
+    def balance_difference(self) -> Decimal:
+        """Return payment amount minus known total."""
+        return self.payment_amount - self.known_total
+
+    @property
+    def is_known_total_balanced(self) -> bool:
+        """Return whether the known total reconciles with the payment amount."""
+        return abs(self.balance_difference) <= Decimal("0.01")
 
     def format_offers(self) -> str:
         """Return human readable representation of ordered offers."""
@@ -152,12 +209,50 @@ class Order:
             for offer in self.offers
         ]
 
+    def print_offers(self) -> str:
+        """Legacy alias for :meth:`format_offers`."""
+        return self.format_offers()
+
     @property
     def order_date(self) -> datetime:
         """Return order date as ``datetime`` with timezone awareness."""
         if self._order_date.tzinfo is None:
             return self._order_date.replace(tzinfo=UTC)
         return self._order_date
+
+    @property
+    def is_balanced(self) -> bool:
+        """Legacy alias for :attr:`is_known_total_balanced`."""
+        return self.is_known_total_balanced
+
+
+@dataclass(slots=True)
+class Delivery:
+    """Single delivery item."""
+
+    cost: MoneyPayload | None
+    name: str | None
+    delivered_by: str | None
+    method_id: str | None
+    status: str | None
+
+    @classmethod
+    def from_payload(cls, payload: DeliveryPayload) -> Delivery:
+        """Create :class:`Delivery` from parsed API payload."""
+        return cls(
+            cost=payload.cost,
+            name=payload.name,
+            delivered_by=payload.delivered_by,
+            method_id=payload.method_id,
+            status=payload.status,
+        )
+
+    @property
+    def cost_amount(self) -> Decimal:
+        """Return delivery cost as decimal value."""
+        if self.cost is None:
+            return Decimal("0")
+        return self.cost.amount
 
 
 @dataclass(slots=True)
@@ -208,11 +303,34 @@ class Payment:
         return details
 
     @property
+    def items_total(self) -> Decimal:
+        """Return the sum of item totals across grouped orders."""
+        return sum((order.items_total for order in self.orders), start=Decimal("0"))
+
+    @property
+    def delivery_total(self) -> Decimal:
+        """Return the sum of delivery totals across grouped orders."""
+        return sum((order.delivery_total for order in self.orders), start=Decimal("0"))
+
+    @property
+    def known_total(self) -> Decimal:
+        """Return the total built from modeled monetary components."""
+        return self.items_total + self.delivery_total
+
+    @property
+    def balance_difference(self) -> Decimal:
+        """Return payment amount minus known total."""
+        return self.amount - self.known_total
+
+    @property
+    def is_known_total_balanced(self) -> bool:
+        """Return whether the known total reconciles with payment amount."""
+        return abs(self.balance_difference) <= self.tolerance
+
+    @property
     def sum_total_cost(self) -> Decimal:
-        """Return the total cost of all orders in the payment."""
-        return sum(
-            (order.total_cost_amount for order in self.orders), start=Decimal("0")
-        )
+        """Legacy alias for the known total."""
+        return self.known_total
 
     @property
     def amount(self) -> Decimal:
@@ -247,12 +365,12 @@ class Payment:
         """Return payment date."""
         if not self.orders:
             raise ValueError("No orders in payment")
-        return self.orders[0].order_date
+        return self.orders[0].payment_date or self.orders[0].create_date
 
     @property
     def is_balanced(self) -> bool:
-        """Whether the order total matches the payment amount within tolerance."""
-        return abs(self.amount - self.sum_total_cost) <= self.tolerance
+        """Legacy alias for :attr:`is_known_total_balanced`."""
+        return self.is_known_total_balanced
 
     def __str__(self) -> str:
         return (

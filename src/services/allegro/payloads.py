@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -18,7 +19,23 @@ class MoneyPayload(_PayloadModel):
 
 
 class SellerPayload(_PayloadModel):
+    id: str | None = None
     login: str
+
+
+class DeliveryPayload(_PayloadModel):
+    cost: MoneyPayload | None = None
+    name: str | None = None
+    delivered_by: str | None = Field(default=None, alias="deliveredBy")
+    method_id: str | None = Field(default=None, alias="methodId")
+    status: str | None = None
+
+
+class OrderStatusPayload(_PayloadModel):
+    primary: dict[str, Any] | None = None
+    primary_custom: dict[str, Any] | None = Field(default=None, alias="primaryCustom")
+    traits: list[str] = Field(default_factory=list)
+    actions: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class OfferPayload(_PayloadModel):
@@ -31,6 +48,9 @@ class OfferPayload(_PayloadModel):
 
 
 class PaymentPayload(_PayloadModel):
+    method_id: str | None = Field(default=None, alias="methodId")
+    status: str | None = None
+    date: datetime | None = None
     amount: MoneyPayload
     provider: str
     method: str
@@ -38,9 +58,14 @@ class PaymentPayload(_PayloadModel):
 
 
 class OrderPayload(_PayloadModel):
+    order_id: str = Field(alias="id")
+    purchase_id: str | None = Field(default=None, alias="purchaseId")
     seller: SellerPayload
     offers: list[OfferPayload]
+    delivery: DeliveryPayload | None = None
+    create_date: datetime | None = Field(default=None, alias="createDate")
     order_date: datetime = Field(alias="orderDate")
+    status: OrderStatusPayload | None = None
     total_cost: MoneyPayload = Field(alias="totalCost")
     payment: PaymentPayload
 
