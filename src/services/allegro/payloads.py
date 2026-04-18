@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -76,6 +76,7 @@ class OrderPayload(_PayloadModel):
         if not isinstance(data, dict):
             return data
 
+        data = cast(dict[str, Any], data)
         total_cost = data.get("totalCost")
         payment = data.get("payment")
         if not isinstance(total_cost, dict) or "currency" in total_cost:
