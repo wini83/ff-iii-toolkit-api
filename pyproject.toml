@@ -41,11 +41,11 @@ ignore_missing_version = true
 dev = [
     "commitizen>=4.13.10",
     "deptry>=0.24.0",
-    "mypy>=1.20.1",
-    "pre-commit>=4.5.1",
+    "mypy>=1.20.2",
+    "pre-commit>=4.6.0",
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
-    "ruff>=0.14.5",
+    "ruff>=0.15.11",
     "ty>=0.0.31",
     "types-requests>=2.32.4.20260107",
 ]
