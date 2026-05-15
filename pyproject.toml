@@ -7,9 +7,9 @@ requires-python = ">=3.12"
 dependencies = [
  "fastapi>=0.136.1",
  "pydantic>=2.13.4",
- "pydantic-settings>=2.14.0",
+ "pydantic-settings>=2.14.1",
  "pyjwt>=2.10.1",
- "python-multipart>=0.0.27",
+ "python-multipart>=0.0.28",
  "starlette>=0.37.2",
  "uvicorn>=0.46.0",
  "python-dotenv>=1.0.0",
@@ -17,7 +17,7 @@ dependencies = [
  "pandas-stubs>=2.3.3.251201",
  "httpx>=0.28.1",
  "ff-iii-luciferin>=1.0.0b5",
- "requests>=2.32.5",
+ "requests>=2.34.1",
  "sqlalchemy>=2.0.45",
  "argon2-cffi>=25.1.0",
  "cryptography>=45.0.0",
@@ -39,15 +39,15 @@ ignore_missing_version = true
 
 [dependency-groups]
 dev = [
-    "commitizen>=4.15.1",
+    "commitizen>=4.16.0",
     "deptry>=0.24.0",
     "mypy>=1.20.2",
     "pre-commit>=4.6.0",
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
     "ruff>=0.15.12",
-    "ty>=0.0.34",
-    "types-requests>=2.33.0.20260503",
+    "ty>=0.0.35",
+    "types-requests>=2.33.0.20260513",
 ]
 
 [tool.deptry]
