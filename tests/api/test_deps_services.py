@@ -5,6 +5,13 @@ import pytest
 
 import api.deps_services as deps_services
 from services.allegro_service import AllegroService, allegro_client_factory
+from services.categorization import (
+    AmountBucketizer,
+    CategorizationTextPreprocessor,
+    DefaultCategorySuggestionService,
+    SnapshotCategorizationProvider,
+    WeightedTransactionSimilarityEngine,
+)
 from services.firefly_base_service import FireflyBaseService
 from services.firefly_enrichment_service import FireflyEnrichmentService
 from services.firefly_tx_service import FireflyTxService
@@ -34,6 +41,7 @@ def clear_dependency_caches():
         deps_services.get_snapshot_blik_metrics_service,
         deps_services.get_snapshot_allegro_metrics_service,
         deps_services.get_snapshot_tx_metrics_service,
+        deps_services.get_category_suggestion_service,
         deps_services.get_secret_crypto_service,
         deps_services.get_vault_session_store,
     ]:
@@ -213,6 +221,31 @@ def test_get_snapshot_tx_metrics_service_uses_both_filters(monkeypatch):
     assert service.snapshot_service is snapshot_service
     assert service.filter_desc_blik == "blik-only"
     assert service.filter_desc_allegro == "allegro-only"
+
+
+def test_get_category_suggestion_service_uses_snapshot_provider(monkeypatch):
+    snapshot_service = MagicMock()
+
+    monkeypatch.setattr(
+        deps_services, "get_transaction_snapshot_service", lambda: snapshot_service
+    )
+
+    service = deps_services.get_category_suggestion_service()
+
+    assert isinstance(service, DefaultCategorySuggestionService)
+    assert isinstance(service._snapshot_provider, SnapshotCategorizationProvider)
+    assert isinstance(service._similarity_engine, WeightedTransactionSimilarityEngine)
+    assert isinstance(
+        service._similarity_engine._preprocessor,
+        CategorizationTextPreprocessor,
+    )
+    assert isinstance(service._similarity_engine._amount_bucketizer, AmountBucketizer)
+    assert isinstance(service._snapshot_provider._amount_bucketizer, AmountBucketizer)
+    assert (
+        service._snapshot_provider._amount_bucketizer
+        is service._similarity_engine._amount_bucketizer
+    )
+    assert service._amount_bucketizer is service._similarity_engine._amount_bucketizer
 
 
 def test_get_user_secrets_service_builds_repositories_from_db():
