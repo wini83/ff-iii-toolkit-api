@@ -1,6 +1,7 @@
 from datetime import UTC, date, datetime
 
 from api.deps_runtime import get_tx_application_runtime
+from api.deps_services import get_category_suggestion_service
 from api.models.tx import (
     ScreeningMonthResponse,
     SimplifiedCategory,
@@ -9,9 +10,10 @@ from api.models.tx import (
 )
 from api.routers.auth import create_access_token
 from services.db.repository import UserRepository
+from services.domain.category_suggestion import CategorySuggestion
 from services.domain.job_base import JobStatus
 from services.domain.metrics import TXStatisticsMetrics
-from services.exceptions import ExternalServiceFailed
+from services.exceptions import ExternalServiceFailed, TransactionNotFound
 from services.tx_stats.models import MetricsState
 
 
@@ -63,6 +65,26 @@ class FakeTxApplicationService:
 
     async def refresh_tx_metrics(self):
         return self.metrics_state
+
+
+class FakeCategorySuggestionService:
+    def __init__(
+        self,
+        *,
+        suggestions: list[CategorySuggestion] | None = None,
+        not_found: bool = False,
+    ) -> None:
+        self.suggestions = suggestions or []
+        self.not_found = not_found
+        self.calls: list[tuple[str, str, int]] = []
+
+    async def suggest_for_transaction_id(
+        self, *, user_id: str, transaction_id: str, limit: int = 3
+    ):
+        self.calls.append((user_id, transaction_id, limit))
+        if self.not_found:
+            raise TransactionNotFound(f"Transaction id {transaction_id} not found")
+        return self.suggestions
 
 
 def _metrics_state() -> MetricsState[TXStatisticsMetrics]:
@@ -208,3 +230,46 @@ def test_tx_stats_refresh_happy_path_returns_200(client, db):
     body = response.json()
     assert body["status"] == "done"
     assert body["result"]["uncategorized_transactions"] == 2
+
+
+def test_tx_category_suggestions_happy_path_returns_200(client, db):
+    user = _create_user(db)
+    service = FakeCategorySuggestionService(
+        suggestions=[
+            CategorySuggestion(
+                category_id="1",
+                category_name="Food",
+                score=0.91,
+                reason="similar merchant in previous transactions",
+            )
+        ]
+    )
+    client.app.dependency_overrides[get_category_suggestion_service] = lambda: service
+
+    response = client.get(
+        "/api/tx/123/category-suggestions",
+        headers=_auth_header(str(user.id)),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["suggestions"][0]["category_id"] == "1"
+    assert body["suggestions"][0]["score"] == 0.91
+    assert (
+        body["suggestions"][0]["reason"] == "similar merchant in previous transactions"
+    )
+    assert service.calls == [(str(user.id), "123", 3)]
+
+
+def test_tx_category_suggestions_missing_transaction_returns_404(client, db):
+    user = _create_user(db)
+    service = FakeCategorySuggestionService(not_found=True)
+    client.app.dependency_overrides[get_category_suggestion_service] = lambda: service
+
+    response = client.get(
+        "/api/tx/999/category-suggestions",
+        headers=_auth_header(str(user.id)),
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Transaction id 999 not found"

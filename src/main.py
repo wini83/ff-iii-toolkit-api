@@ -10,6 +10,7 @@ from api.routers.blik_files import router as blik_router
 from api.routers.citi_import import router as citi_import_router
 from api.routers.me import router as me_router
 from api.routers.system import router as system_router
+from api.routers.transactions import router as transactions_router
 from api.routers.tx import router as tx_router
 from api.routers.user_secrets import router as user_secrets_router
 from api.routers.users import router as users_router
@@ -63,6 +64,7 @@ def create_app(*, bootstrap: DatabaseBootstrap | None = None) -> FastAPI:
     app.include_router(me_router)
     app.include_router(blik_router)
     app.include_router(citi_import_router)
+    app.include_router(transactions_router)
     app.include_router(tx_router)
     app.include_router(allegro_router)
     app.include_router(users_router)

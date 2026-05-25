@@ -6,6 +6,14 @@ from sqlalchemy.orm import Session
 
 from api.deps_db import get_db
 from services.allegro_service import AllegroService, allegro_client_factory
+from services.categorization import (
+    AmountBucketizer,
+    CategorizationTextPreprocessor,
+    DefaultCategorySuggestionService,
+    SnapshotCategorizationProvider,
+    WeightedTransactionSimilarityEngine,
+)
+from services.categorization.service import CategorySuggestionService
 from services.db.repository import (
     AuditLogRepository,
     UserRepository,
@@ -100,6 +108,24 @@ def get_snapshot_tx_metrics_service() -> SnapshotTxMetricsService:
         snapshot_service=get_transaction_snapshot_service(),
         filter_desc_blik=settings.BLIK_DESCRIPTION_FILTER,
         filter_desc_allegro=getattr(settings, "ALLEGRO_DESCRIPTION_FILTER", "allegro"),
+    )
+
+
+@lru_cache(maxsize=1)
+def get_category_suggestion_service() -> CategorySuggestionService:
+    amount_bucketizer = AmountBucketizer()
+    snapshot_provider = SnapshotCategorizationProvider(
+        snapshot_service=get_transaction_snapshot_service(),
+        amount_bucketizer=amount_bucketizer,
+    )
+    similarity_engine = WeightedTransactionSimilarityEngine(
+        preprocessor=CategorizationTextPreprocessor(),
+        amount_bucketizer=amount_bucketizer,
+    )
+    return DefaultCategorySuggestionService(
+        snapshot_provider=snapshot_provider,
+        similarity_engine=similarity_engine,
+        amount_bucketizer=amount_bucketizer,
     )
 
 

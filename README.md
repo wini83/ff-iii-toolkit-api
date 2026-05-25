@@ -144,6 +144,7 @@ Endpoint summary from current routers:
 | `GET` | `/api/blik_files/{encoded_id}/matches` | Active user | Compute BLIK-to-Firefly match candidates. |
 | `POST` | `/api/blik_files/{encoded_id}/matches` | Active user | Apply selected BLIK matches. |
 | `GET` | `/api/tx/screening` | Active user | List month transactions eligible for manual categorization. |
+| `GET` | `/api/tx/{tx_id}/category-suggestions` | Active user | Suggest categories for a stored transaction from the snapshot. |
 | `POST` | `/api/tx/{tx_id}/category/{category_id}` | Active user | Apply category to transaction. |
 | `POST` | `/api/tx/{tx_id}/tag/` | Active user | Add tag to transaction. |
 | `GET` | `/api/tx/statistics` | Active user | Get transaction metrics state/result. |

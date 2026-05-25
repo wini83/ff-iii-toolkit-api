@@ -1,10 +1,18 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.deps_runtime import get_tx_application_runtime
+from api.deps_services import get_category_suggestion_service
 from api.mappers.tx_stats import map_tx_state_to_response
+from api.models.category_suggestions import (
+    CategorySuggestionDto,
+    CategorySuggestionsResponse,
+)
 from api.models.tx import ScreeningMonthResponse, TxTag
 from api.models.tx_stats import TxMetricsStatusResponse
-from services.exceptions import ExternalServiceFailed
+from services.categorization.service import CategorySuggestionService
+from services.exceptions import ExternalServiceFailed, TransactionNotFound
 from services.guards import require_active_user
 from services.tx_application_service import TxApplicationService
 
@@ -81,6 +89,37 @@ async def get_tx_stats(
 ):
     state = await svc.get_tx_metrics()
     return map_tx_state_to_response(state)
+
+
+@router.get(
+    "/{tx_id}/category-suggestions",
+    response_model=CategorySuggestionsResponse,
+)
+async def suggest_category(
+    tx_id: int,
+    user_id: UUID = Depends(require_active_user),
+    service: CategorySuggestionService = Depends(get_category_suggestion_service),
+):
+    try:
+        suggestions = await service.suggest_for_transaction_id(
+            user_id=str(user_id),
+            transaction_id=str(tx_id),
+            limit=3,
+        )
+    except TransactionNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return CategorySuggestionsResponse(
+        suggestions=[
+            CategorySuggestionDto(
+                category_id=suggestion.category_id,
+                category_name=suggestion.category_name,
+                score=suggestion.score,
+                reason=suggestion.reason,
+            )
+            for suggestion in suggestions
+        ]
+    )
 
 
 @router.post(
