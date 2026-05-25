@@ -2,8 +2,13 @@ import asyncio
 from datetime import date, datetime
 from decimal import Decimal
 
+import pytest
+
 from services.categorization.amount_bucketizer import AmountBucketizer
-from services.categorization.snapshot_provider import SnapshotCategorizationProvider
+from services.categorization.snapshot_provider import (
+    CategorizationSnapshotProvider,
+    SnapshotCategorizationProvider,
+)
 from services.domain.metrics import FetchMetrics
 from services.domain.transaction import (
     AccountRef,
@@ -14,6 +19,7 @@ from services.domain.transaction import (
     TxTag,
     TxType,
 )
+from services.exceptions import TransactionNotFound
 from services.snapshot.models import TransactionSnapshot
 
 
@@ -91,9 +97,36 @@ def test_get_candidate_documents_for_user_filters_uncategorized_and_internal_ops
                     type=AccountType.RECONCILIATION,
                 ),
             ),
+            _transaction(
+                tx_id=5,
+                tx_type=TxType.WITHDRAWAL,
+                amount=Decimal("8.50"),
+                category=Category(id=40, name="Transport"),
+                merchant="Taxi",
+                tags={TxTag.blik_done},
+            ),
+            _transaction(
+                tx_id=6,
+                tx_type=TxType.WITHDRAWAL,
+                amount=Decimal("15.00"),
+                category=Category(id=50, name="Shopping"),
+                notes="allegro purchase",
+                tags={TxTag.allegro_done},
+            ),
+            _transaction(
+                tx_id=7,
+                tx_type=TxType.DEPOSIT,
+                amount=Decimal("300.00"),
+                category=Category(id=60, name="Internal"),
+                source_account=AccountRef(
+                    id=2,
+                    name="internal-source",
+                    type=AccountType.INITIAL_BALANCE,
+                ),
+            ),
         ],
         metrics=FetchMetrics(
-            total_transactions=4,
+            total_transactions=7,
             fetching_duration_ms=1,
             invalid=0,
             multipart=0,
@@ -106,11 +139,15 @@ def test_get_candidate_documents_for_user_filters_uncategorized_and_internal_ops
     )
 
     documents = asyncio.run(provider.get_candidate_documents_for_user("user-1"))
+    wrapper_documents = asyncio.run(provider.get_documents_for_user("user-1"))
 
-    assert [doc.transaction_id for doc in documents] == ["1"]
+    assert [doc.transaction_id for doc in documents] == ["1", "5", "6"]
+    assert [doc.transaction_id for doc in wrapper_documents] == ["1", "5", "6"]
     assert documents[0].category_id == "10"
     assert documents[0].amount_bucket == bucketizer.bucket_for_amount(Decimal("12.00"))
     assert documents[0].source_type == "bank"
+    assert documents[1].source_type == "blik"
+    assert documents[2].source_type == "allegro"
 
 
 def test_get_query_for_transaction_id_builds_query_from_snapshot():
@@ -149,3 +186,84 @@ def test_get_query_for_transaction_id_builds_query_from_snapshot():
     assert query.amount == Decimal("12.34")
     assert query.amount_bucket == bucketizer.bucket_for_amount(Decimal("12.34"))
     assert query.source_type == "blik"
+
+
+def test_get_query_for_transaction_id_raises_for_missing_transaction():
+    bucketizer = AmountBucketizer()
+    snapshot = TransactionSnapshot(
+        transactions=[],
+        metrics=FetchMetrics(
+            total_transactions=0,
+            fetching_duration_ms=1,
+            invalid=0,
+            multipart=0,
+        ),
+        fetched_at=datetime(2024, 1, 1),
+    )
+    provider = SnapshotCategorizationProvider(
+        snapshot_service=_SnapshotService(snapshot),
+        amount_bucketizer=bucketizer,
+    )
+
+    with pytest.raises(TransactionNotFound, match="Transaction id 404 not found"):
+        asyncio.run(provider.get_query_for_transaction_id("user-1", "404"))
+
+
+def test_snapshot_provider_base_contract_raises_not_implemented():
+    class _Dummy:
+        async def get_candidate_documents_for_user(self, user_id: str):
+            raise NotImplementedError
+
+    with pytest.raises(NotImplementedError):
+        asyncio.run(
+            CategorizationSnapshotProvider.get_candidate_documents_for_user(
+                object(), "user-1"
+            )
+        )
+    with pytest.raises(NotImplementedError):
+        asyncio.run(
+            CategorizationSnapshotProvider.get_documents_for_user(_Dummy(), "user-1")
+        )
+    with pytest.raises(NotImplementedError):
+        asyncio.run(
+            CategorizationSnapshotProvider.get_query_for_transaction_id(
+                object(), "user-1", "1"
+            )
+        )
+
+
+def test_get_query_for_transaction_id_finds_later_transaction():
+    bucketizer = AmountBucketizer()
+    snapshot = TransactionSnapshot(
+        transactions=[
+            _transaction(
+                tx_id=1,
+                tx_type=TxType.WITHDRAWAL,
+                amount=Decimal("5.00"),
+                category=None,
+            ),
+            _transaction(
+                tx_id=2,
+                tx_type=TxType.WITHDRAWAL,
+                amount=Decimal("9.00"),
+                category=None,
+                notes="target",
+            ),
+        ],
+        metrics=FetchMetrics(
+            total_transactions=2,
+            fetching_duration_ms=1,
+            invalid=0,
+            multipart=0,
+        ),
+        fetched_at=datetime(2024, 1, 1),
+    )
+    provider = SnapshotCategorizationProvider(
+        snapshot_service=_SnapshotService(snapshot),
+        amount_bucketizer=bucketizer,
+    )
+
+    query = asyncio.run(provider.get_query_for_transaction_id("user-1", "2"))
+
+    assert query.transaction_id == "2"
+    assert query.notes == "target"
