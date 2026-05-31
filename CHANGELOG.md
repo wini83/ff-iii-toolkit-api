@@ -1,3 +1,9 @@
+## v2.14.0 (2026-05-31)
+
+### Feat
+
+- refactor category suggestions endpoint (#89)
+
 ## v2.13.2 (2026-05-02)
 
 ## v2.13.1 (2026-04-18)
