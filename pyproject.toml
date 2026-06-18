@@ -43,9 +43,9 @@ dev = [
     "deptry>=0.24.0",
     "mypy>=1.20.2",
     "pre-commit>=4.6.0",
-    "pytest>=9.0.2",
+    "pytest>=9.1.0",
     "pytest-cov>=7.0.0",
-    "ruff>=0.15.16",
+    "ruff>=0.15.17",
     "ty>=0.0.50",
     "types-requests>=2.33.0.20260518",
 ]
