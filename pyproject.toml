@@ -7,7 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
  "fastapi>=0.138.0",
  "pydantic>=2.13.4",
- "pydantic-settings>=2.14.1",
+ "pydantic-settings>=2.14.2",
  "pyjwt>=2.13.0",
  "python-multipart>=0.0.32",
  "starlette>=0.37.2",
@@ -39,14 +39,14 @@ ignore_missing_version = true
 
 [dependency-groups]
 dev = [
-    "commitizen>=4.16.3",
+    "commitizen>=4.16.4",
     "deptry>=0.24.0",
     "mypy>=1.20.2",
     "pre-commit>=4.6.0",
     "pytest>=9.1.1",
     "pytest-cov>=7.0.0",
     "ruff>=0.15.19",
-    "ty>=0.0.50",
+    "ty>=0.0.55",
     "types-requests>=2.33.0.20260518",
 ]
 
