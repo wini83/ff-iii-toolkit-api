@@ -11,7 +11,7 @@ dependencies = [
  "pyjwt>=2.13.0",
  "python-multipart>=0.0.32",
  "starlette>=0.37.2",
- "uvicorn>=0.51.0",
+ "uvicorn>=0.52.0",
  "python-dotenv>=1.0.0",
  "pandas>=2.3.3",
  "pandas-stubs>=2.3.3.251201",
@@ -39,14 +39,14 @@ ignore_missing_version = true
 
 [dependency-groups]
 dev = [
-    "commitizen>=4.16.5",
+    "commitizen>=4.17.0",
     "deptry>=0.24.0",
     "mypy>=1.20.2",
     "pre-commit>=4.6.0",
     "pytest>=9.1.1",
     "pytest-cov>=7.0.0",
     "ruff>=0.15.20",
-    "ty>=0.0.59",
+    "ty>=0.0.65",
     "types-requests>=2.33.0.20260712",
 ]
 
