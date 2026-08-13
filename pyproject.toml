@@ -21,7 +21,7 @@ dependencies = [
  "sqlalchemy>=2.0.51",
  "argon2-cffi>=25.1.0",
  "cryptography>=45.0.0",
- "alembic>=1.18.5",
+ "alembic>=1.19.1",
 ]
 
 
