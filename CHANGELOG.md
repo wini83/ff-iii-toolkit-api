@@ -1,3 +1,13 @@
+## v2.15.0 (2026-08-24)
+
+### Feat
+
+- **release**: finalize releases and sync dev
+- **release**: prepare releases through pull requests
+- **ci**: allow explicit release image publishing
+
+## v2.14.1 (2026-08-05)
+
 ## v2.14.0 (2026-05-31)
 
 ### Feat
