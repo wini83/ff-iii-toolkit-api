@@ -2,7 +2,14 @@ name: Build & Publish Docker Image
 
 on:
   push:
-    tags: [ "v*" ]
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag to publish (vX.Y.Z)
+        required: true
+        type: string
 
 jobs:
   build:
@@ -13,8 +20,29 @@ jobs:
       packages: write
 
     steps:
-      - name: Checkout code
+      - name: Resolve release tag
+        id: release
+        shell: bash
+        env:
+          INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            tag="$INPUT_RELEASE_TAG"
+          else
+            tag="${GITHUB_REF_NAME}"
+          fi
+
+          if [[ ! "$tag" =~ ^v[0-9] ]]; then
+            echo "Invalid release tag: $tag" >&2
+            exit 1
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout release tag
         uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.release.outputs.tag }}
 
       - name: Log in to GHCR
         uses: docker/login-action@v4
@@ -23,17 +51,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels)
+      - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ github.repository_owner }}/ff-iii-toolkit-api
           tags: |
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/heads/main') }}
+            type=raw,value=${{ steps.release.outputs.tag }}
             type=sha
-            type=ref,event=tag
 
-      - name: Build image
+      - name: Build and publish image
         uses: docker/build-push-action@v7
         with:
           push: true
