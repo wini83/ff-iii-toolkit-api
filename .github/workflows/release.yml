@@ -1,0 +1,136 @@
+name: Prepare release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: prepare-release-main
+  cancel-in-progress: false
+
+jobs:
+  prepare-release:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout complete history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Sync dependencies
+        run: uv sync --frozen
+
+      - name: Check release state
+        id: state
+        shell: bash
+        run: |
+          current_version="$(uv run --frozen cz version -p)"
+          echo "Current project version: $current_version"
+
+          if ! git rev-parse -q --verify "refs/tags/v${current_version}" >/dev/null; then
+            echo "Current version v${current_version} is not tagged yet; release finalization is pending."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      - name: Determine next version
+        if: steps.state.outputs.ready == 'true'
+        id: version
+        shell: bash
+        run: |
+          set +e
+          next_version="$(uv run --frozen cz bump --dry-run --yes --get-next)"
+          status=$?
+          set -e
+
+          if [[ $status -eq 3 || $status -eq 21 ]]; then
+            echo "No releasable Conventional Commit found. Skipping release."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ $status -ne 0 ]]; then
+            echo "Commitizen failed with exit code $status" >&2
+            exit "$status"
+          fi
+
+          echo "Next version: $next_version"
+          echo "should_release=true" >> "$GITHUB_OUTPUT"
+          echo "version=$next_version" >> "$GITHUB_OUTPUT"
+
+      - name: Check release branch
+        if: steps.version.outputs.should_release == 'true'
+        id: branch
+        env:
+          RELEASE_BRANCH: release/v${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          if git ls-remote --exit-code --heads origin "$RELEASE_BRANCH" >/dev/null 2>&1; then
+            echo "Release branch $RELEASE_BRANCH already exists; reusing it."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Release branch $RELEASE_BRANCH does not exist yet."
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure release author
+        if: steps.version.outputs.should_release == 'true' && steps.branch.outputs.exists == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Prepare release commit
+        if: steps.version.outputs.should_release == 'true' && steps.branch.outputs.exists == 'false'
+        run: |
+          uv run cz bump --yes --check-consistency
+          git tag -d "v${{ steps.version.outputs.version }}"
+
+      - name: Push release branch
+        if: steps.version.outputs.should_release == 'true' && steps.branch.outputs.exists == 'false'
+        env:
+          RELEASE_BRANCH: release/v${{ steps.version.outputs.version }}
+        run: |
+          git push origin HEAD:"refs/heads/${RELEASE_BRANCH}"
+
+      - name: Ensure release pull request
+        if: steps.version.outputs.should_release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_BRANCH: release/v${{ steps.version.outputs.version }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          existing_pr="$(gh pr list \
+            --base main \
+            --head "$RELEASE_BRANCH" \
+            --state open \
+            --json url \
+            --jq '.[0].url // empty')"
+
+          if [[ -n "$existing_pr" ]]; then
+            echo "Release PR already exists: $existing_pr"
+            exit 0
+          fi
+
+          gh pr create \
+            --base main \
+            --head "$RELEASE_BRANCH" \
+            --title "bump: version $RELEASE_VERSION" \
+            --body "Automated release preparation for v$RELEASE_VERSION.\n\nMerge this PR after required checks pass. After merge, the release finalizer will create the Git tag, GitHub Release, publish the GHCR image, and sync released main back to dev."
