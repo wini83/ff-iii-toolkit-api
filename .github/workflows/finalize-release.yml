@@ -1,0 +1,140 @@
+name: Finalize release
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+
+permissions:
+  contents: write
+  actions: write
+  pull-requests: write
+
+concurrency:
+  group: finalize-release-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  finalize-release:
+    if: >-
+      github.event.pull_request.merged == true &&
+      startsWith(github.event.pull_request.head.ref, 'release/v')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Configure release author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Resolve release version
+        id: version
+        env:
+          RELEASE_BRANCH: ${{ github.event.pull_request.head.ref }}
+        shell: bash
+        run: |
+          version="${RELEASE_BRANCH#release/v}"
+          if [[ -z "$version" || "$version" == "$RELEASE_BRANCH" ]]; then
+            echo "Unable to resolve release version from branch: $RELEASE_BRANCH" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push release tag
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          tag="v${RELEASE_VERSION}"
+          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            echo "Tag ${tag} already exists locally."
+          else
+            git tag -a "$tag" -m "$tag"
+          fi
+          git push origin "$tag"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          tag="v${RELEASE_VERSION}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "GitHub Release ${tag} already exists."
+          else
+            gh release create "$tag" \
+              --title "$tag" \
+              --generate-notes
+          fi
+
+      - name: Trigger image publishing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh workflow run build.yml \
+            --ref "v${RELEASE_VERSION}" \
+            -f release_tag="v${RELEASE_VERSION}"
+
+      - name: Create main-to-dev sync branch
+        id: sync
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          sync_branch="sync/main-to-dev-v${RELEASE_VERSION}"
+          echo "branch=$sync_branch" >> "$GITHUB_OUTPUT"
+
+          if git ls-remote --exit-code --heads origin "$sync_branch" >/dev/null 2>&1; then
+            echo "Sync branch ${sync_branch} already exists; reusing it."
+            exit 0
+          fi
+
+          git push origin HEAD:"refs/heads/${sync_branch}"
+
+      - name: Ensure main-to-dev pull request
+        id: sync_pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          SYNC_BRANCH: ${{ steps.sync.outputs.branch }}
+        shell: bash
+        run: |
+          existing_pr="$(gh pr list \
+            --base dev \
+            --head "$SYNC_BRANCH" \
+            --state open \
+            --json number,url \
+            --jq '.[0] // empty')"
+
+          if [[ -n "$existing_pr" ]]; then
+            pr_number="$(jq -r '.number' <<< "$existing_pr")"
+            pr_url="$(jq -r '.url' <<< "$existing_pr")"
+            echo "Sync PR already exists: $pr_url"
+          else
+            pr_url="$(gh pr create \
+              --base dev \
+              --head "$SYNC_BRANCH" \
+              --title "chore(release): sync v${RELEASE_VERSION} back to dev" \
+              --body "Automated back-merge of released main into dev after v${RELEASE_VERSION}.")"
+            pr_number="${pr_url##*/}"
+            echo "Created sync PR: $pr_url"
+          fi
+
+          echo "number=$pr_number" >> "$GITHUB_OUTPUT"
+          echo "url=$pr_url" >> "$GITHUB_OUTPUT"
+
+      - name: Enable auto-merge for sync pull request
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.sync_pr.outputs.number }}
+        run: |
+          gh pr merge "$PR_NUMBER" --auto --merge
