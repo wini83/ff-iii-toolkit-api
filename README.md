@@ -8,6 +8,17 @@ FastAPI backend for reconciling Firefly III transactions with BLIK CSV imports a
 [![codecov](https://codecov.io/github/wini83/ff-iii-toolkit-api/graph/badge.svg?token=R5ULUOVPH1)](https://codecov.io/github/wini83/ff-iii-toolkit-api)
 ![Python](https://img.shields.io/badge/python-3.12-blue)
 
+> ## ⚠️ Repository migrated
+  >
+  > Development has moved to the [ff-iii-toolkit monorepo](https://github.com/wini83/ff-iii-toolkit).
+  >
+  > The backend now lives in [`backend/`](https://github.com/wini83/ff-iii-toolkit/tree/main/backend).
+  >
+  > This repository is kept read-only for historical reference and will be archived after the monorepo release is established.
+  >
+  > For active development, issues, releases, and documentation, use:
+  > **https://github.com/wini83/ff-iii-toolkit**
+
 ## Table of contents
 - [What it does](#what-it-does)
 - [Key features](#key-features)
